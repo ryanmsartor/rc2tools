@@ -54,6 +54,12 @@ ABILITIES = {
     ),
 }
 
+ADDITIONAL_TABLES = {
+    "zold_a_damage": (0x15CA6, LEVELS, 1),
+    "lookup_0x17165": (0x17165, 8, 2),
+    "lookup_0x17175": (0x17175, 8, 2),
+}
+
 XXD_ROW = re.compile(
     r"^([0-9a-fA-F]{8}): ((?:[0-9a-fA-F]{4} ){7}[0-9a-fA-F]{4})  "
 )
@@ -114,7 +120,16 @@ def extract_json(rom: bytes) -> dict:
                 for column, field in enumerate(fields)
             }
         characters[name] = character
-    return {"characters": characters}
+    additional_tables = {}
+    for name, (offset, entries, width) in ADDITIONAL_TABLES.items():
+        if width == 1:
+            additional_tables[name] = list(rom[offset:offset + entries])
+        else:
+            additional_tables[name] = [
+                list(rom[offset + index * width:offset + (index + 1) * width])
+                for index in range(entries)
+            ]
+    return {"characters": characters, "additional_tables": additional_tables}
 
 
 def output_path(root: Path, rom: bytes) -> Path:

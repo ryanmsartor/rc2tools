@@ -65,15 +65,40 @@ class ExtractGameTests(unittest.TestCase):
                 for column, field in enumerate(fields):
                     self.assertEqual(actual[field], list(self.rom[offset + column:offset + 16 * len(fields):len(fields)]))
 
+    def test_additional_tables_are_read_at_mapped_offsets(self):
+        game = extract_json.extract_json(self.rom)
+        additional = game["additional_tables"]
+        self.assertEqual(
+            additional["zold_a_damage"],
+            list(self.rom[0x15CA6:0x15CB6]),
+        )
+        self.assertEqual(
+            additional["lookup_0x17165"],
+            [list(self.rom[offset:offset + 2]) for offset in range(0x17165, 0x17175, 2)],
+        )
+        self.assertEqual(
+            additional["lookup_0x17175"],
+            [list(self.rom[offset:offset + 2]) for offset in range(0x17175, 0x17185, 2)],
+        )
+
     def test_changed_rom_bytes_change_extracted_values(self):
         original = extract_json.extract_json(self.rom)
         self.rom[0x17065] = (self.rom[0x17065] + 1) % 256
         self.rom[0x15511 + 3 * 7 + 2] = (self.rom[0x15511 + 3 * 7 + 2] + 1) % 256
+        self.rom[0x15CA6] = (self.rom[0x15CA6] + 1) % 256
+        self.rom[0x17165] = (self.rom[0x17165] + 1) % 256
+        self.rom[0x17166] = (self.rom[0x17166] + 1) % 256
         changed = extract_json.extract_json(self.rom)
         self.assertEqual(changed["characters"]["hero"]["hp"][0], self.rom[0x17065])
         self.assertNotEqual(changed["characters"]["hero"]["hp"][0], original["characters"]["hero"]["hp"][0])
         self.assertEqual(changed["characters"]["pit"]["abilities"]["bomb"]["unknown"][7], self.rom[0x15511 + 3 * 7 + 2])
         self.assertNotEqual(changed["characters"]["pit"]["abilities"]["bomb"]["unknown"][7], original["characters"]["pit"]["abilities"]["bomb"]["unknown"][7])
+        self.assertEqual(changed["additional_tables"]["zold_a_damage"][0], self.rom[0x15CA6])
+        self.assertEqual(changed["additional_tables"]["lookup_0x17165"][0], list(self.rom[0x17165:0x17167]))
+        self.assertNotEqual(
+            changed["additional_tables"]["lookup_0x17165"][0],
+            original["additional_tables"]["lookup_0x17165"][0],
+        )
 
     def test_output_path_uses_sha256_of_rom_bytes(self):
         root = Path("repo")

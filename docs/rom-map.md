@@ -72,7 +72,7 @@ The right-margin annotations in [rc2.hex](./rc2.hex) identify these tables by ma
 
 Each listed table has 16 entries, ordered as levels 1 through 16 according to the annotations and the repeating layout. Values are raw hexadecimal bytes, not decimal: e.g. `1E` is decimal 30. For multi-byte records, a slash separates fields within one level; spaces separate successive levels. The byte order and field labels follow the margin notes; uncertain fields are retained as such.
 
-The `./rc2t extract-json` command reads these ranges from the input ROM and writes `output/<rom-sha256>.json`, where the lowercase SHA-256 is computed from the ROM bytes (also when the input is a hex dump). It also accepts a full ROM hex dump as an argument. Its `characters` object groups HP, MP, and ability field arrays by character; array index 0 corresponds to level 1. Each ability field is a separate array. The repeated bytes in Lane's healing and Lora's heal are named `unknown_1` and `unknown_2` because their roles are uncertain; other `unknown` fields are likewise unidentified. The tentative table boundaries and field interpretations below also apply to the JSON.
+The `./rc2t extract-json` command reads these ranges from the input ROM and writes `output/<rom-sha256>.json`, where the lowercase SHA-256 is computed from the ROM bytes (also when the input is a hex dump). It also accepts a full ROM hex dump as an argument. Its `characters` object groups HP, MP, and ability field arrays by character; array index 0 corresponds to level 1. Each ability field is a separate array. `additional_tables` contains the standalone Zold A damage table and two paired-byte lookup tables described below. The repeated bytes in Lane's healing and Lora's heal are named `unknown_1` and `unknown_2` because their roles are uncertain; other `unknown` fields are likewise unidentified. The tentative table boundaries and field interpretations below also apply to the JSON.
 
 ### HP and MP by level
 
@@ -81,19 +81,19 @@ These are contiguous single-byte tables: eight HP tables followed by eight MP ta
 | Character | Stat | ROM range | Values for levels 1-16 (hex) |
 |---|---|---|---|
 | Hero | HP | `0x17065-0x17074` | `1E 2D 3C 4B 5A 69 78 87 96 A5 B4 C3 D2 E1 F0 FF` |
-| Pit | HP | `0x17075-0x17084` | `28 32 3C 46 50 5A 64 6E 73 78 7D 82 87 8C 91 96` |
+| Pit  | HP | `0x17075-0x17084` | `28 32 3C 46 50 5A 64 6E 73 78 7D 82 87 8C 91 96` |
 | Lane | HP | `0x17085-0x17094` | `3C 4B 5A 69 78 82 8C 96 9D A4 AB B2 B9 BE C3 C8` |
 | Kyle | HP | `0x17095-0x170A4` | `50 54 58 5C 64 6C 74 7C 88 94 A0 AC BC CC DC F0` |
 | Jude | HP | `0x170A5-0x170B4` | `32 37 3C 41 46 4B 50 55 5A 5F 64 69 6E 73 78 82` |
-| Lee | HP | `0x170B5-0x170C4` | `78 82 8C 96 A0 A8 B0 B8 C0 C6 CC D0 D4 D6 D8 DC` |
+| Lee  | HP | `0x170B5-0x170C4` | `78 82 8C 96 A0 A8 B0 B8 C0 C6 CC D0 D4 D6 D8 DC` |
 | Lora | HP | `0x170C5-0x170D4` | `50 5A 64 78 82 8C 96 AA B4 BE C8 D2 DC E6 F0 FF` |
 | Zold | HP | `0x170D5-0x170E4` | `B4 B9 BE C3 C8 CD D2 D7 DC E1 E6 EB F0 F5 FA FF` |
 | Hero | MP | `0x170E5-0x170F4` | `0A 14 1E 28 32 3C 46 50 5A 64 6E 78 82 8C 96 A0` |
-| Pit | MP | `0x170F5-0x17104` | `28 2E 34 3A 40 46 4C 52 56 5C 62 68 6E 74 7A 82` |
+| Pit  | MP | `0x170F5-0x17104` | `28 2E 34 3A 40 46 4C 52 56 5C 62 68 6E 74 7A 82` |
 | Lane | MP | `0x17105-0x17114` | `14 19 1E 23 28 2D 32 37 3C 41 46 50 5A 64 6E 78` |
 | Kyle | MP | `0x17115-0x17124` | `28 32 3C 46 50 5A 64 6E 73 78 7D 82 87 8C 91 96` |
 | Jude | MP | `0x17125-0x17134` | `64 66 68 6C 72 78 80 88 8E 96 A0 AA B4 BE C8 C8` |
-| Lee | MP | `0x17135-0x17144` | `14 1A 20 26 2C 32 38 3E 46 4E 56 5E 66 6E 76 82` |
+| Lee  | MP | `0x17135-0x17144` | `14 1A 20 26 2C 32 38 3E 46 4E 56 5E 66 6E 76 82` |
 | Lora | MP | `0x17145-0x17154` | `50 5A 64 6E 73 78 7D 82 87 8C 91 96 9B A0 AA B4` |
 | Zold | MP | `0x17155-0x17164` | `32 3C 46 50 5A 64 6E 78 82 8C 96 A0 AA B4 BE C8` |
 
@@ -123,6 +123,23 @@ These are contiguous single-byte tables: eight HP tables followed by eight MP ta
 | Lora wing | cost | `0x15C96-0x15CA5` | `0F 0E 0D 0C 0B 0A 09 08 07 06 05 04 03 02 01 00` |
 | Zold A | range / damage | `0x15CB6-0x15CD5` | `0A/87 0A/8F 0A/97 0A/9F 0B/A7 0B/AF 0B/B7 0B/BF 0C/C7 0C/CF 0C/D7 0C/DF 0D/E7 0D/EF 0D/F7 0D/FF` |
 | Zold B | cost / damage | `0x15CE8-0x15D07` | `14/97 14/9F 14/A7 14/AF 14/B7 14/BF 14/C7 14/CF 14/D3 14/D7 14/DB 14/DF 14/E3 14/E7 14/EB 14/EF` |
+
+### Additional tables
+
+The Zold A damage values also appear as a standalone 16-byte array immediately before the range/damage records. The ROM has code references to this array at CPU address `0x5CA6`; its values match the damage byte of each Zold A record:
+
+| Table | ROM range | Values (hex) |
+|---|---|---|
+| Zold A standalone damage | `0x15CA6-0x15CB5` | `87 8F 97 9F A7 AF B7 BF C7 CF D7 DF E7 EF F7 FF` |
+
+Two more arrays follow the character MP tables. Each has eight two-byte entries. These are stored in the JSON as arrays of two-byte arrays under `additional_tables`; values below are shown as `first/second` bytes. Their exact purpose and second-byte meaning are unknown.
+
+| Table | ROM range | Entries (hex) |
+|---|---|---|
+| Lookup at `0x17165` | `0x17165-0x17174` | `00/01 02/04 05/06 08/09 0B/0D 0E/10 11/12 14/16` |
+| Lookup at `0x17175` | `0x17175-0x17184` | `00/01 03/04 05/07 08/0A 0C/0D 0E/0F 11/13 15/16` |
+
+Fixed-bank code at `0x009DE-0x009EB` loads one of these table bases (`0x7165` or `0x7175` in the banked CPU window), indexes with the value previously read from `0xC3F8` using a two-byte stride, reads the first byte of that pair, and stores it at `0xC340`. The branch selecting the base depends on flags from a preceding helper call operating on work RAM at `0xC405`; the meaning of that state and what the lookup result represents have not been identified. The banked CPU addresses correspond to the listed physical offsets when ROM bank 5 is selected.
 
 **Boundary and interpretation caveats:**
 
