@@ -72,6 +72,8 @@ The right-margin annotations in [rc2.hex](./rc2.hex) identify these tables by ma
 
 Each listed table has 16 entries, ordered as levels 1 through 16 according to the annotations and the repeating layout. Values are raw hexadecimal bytes, not decimal: e.g. `1E` is decimal 30. For multi-byte records, a slash separates fields within one level; spaces separate successive levels. The byte order and field labels follow the margin notes; uncertain fields are retained as such.
 
+The `./rc2t extract-json` command reads these ranges from the input ROM and writes `output/<rom-sha256>.json`, where the lowercase SHA-256 is computed from the ROM bytes (also when the input is a hex dump). It also accepts a full ROM hex dump as an argument. Its `characters` object groups HP, MP, and ability field arrays by character; array index 0 corresponds to level 1. Each ability field is a separate array. The repeated bytes in Lane's healing and Lora's heal are named `unknown_1` and `unknown_2` because their roles are uncertain; other `unknown` fields are likewise unidentified. The tentative table boundaries and field interpretations below also apply to the JSON.
+
 ### HP and MP by level
 
 These are contiguous single-byte tables: eight HP tables followed by eight MP tables. For example, Hero HP level 1 is `0x1E` at `0x17065`; level 16 is `0xFF` at `0x17074`.

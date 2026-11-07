@@ -10,6 +10,7 @@ rc2t_print_help_message() {
     echo "Commands:"
     echo "  dump-hex      Dump the contents in hexadecimal"
     echo "  check-hash    Check the hash"
+    echo "  extract-json [rom-or-hex]  Extract character stats into output/<rom-sha256>.json"
 }
 
 _check_if_rom_exists() {
@@ -41,6 +42,14 @@ case "$1" in
     dump-hex)
         _check_if_rom_exists
         xxd "input/$ROM_NAME" > "output/$ROM_NAME.hex"
+        ;;
+
+    extract-json)
+        if [ "$#" -gt 2 ]; then
+            echo "Error: extract-json accepts at most one input path." >&2
+            exit 1
+        fi
+        python3 bin/extract_json.py "${@:2}"
         ;;
 
     *)
