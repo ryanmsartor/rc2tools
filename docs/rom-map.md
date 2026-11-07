@@ -1,0 +1,148 @@
+# Rolan's Curse II (USA) ROM map
+
+This is an initial, evidence-based map of the ROM. ROM file offsets and CPU addresses are distinct, especially in the banked window. The separate [save file analysis](./save-file-analysis.md) documents observations from a hex-dumped `.sav` file; its labels are not ROM or CPU addresses.
+
+## ROM and cartridge layout
+
+The source examined here is `input/Rolan's Curse II (USA).gb` (131,072 bytes). The header bytes are at their standard Game Boy header offsets:
+
+| ROM offset | Bytes | Meaning |
+|---|---|---|
+| `0x0100` | `00 C3 50 01` | Entry sequence: `NOP`, then jump to CPU address `0x0150`. |
+| `0x0104-0x0133` | Nintendo logo data | Header logo field. |
+| `0x0134-0x0143` | `ROLAN'S CURSE 2` and padding | Cartridge title. |
+| `0x0143` | `00` | Non-CGB header flag. |
+| `0x0147` | `06` | Cartridge type: MBC2 with battery. |
+| `0x0148` | `02` | ROM size: 128 KiB (8 banks of 16 KiB). |
+| `0x0149` | `00` | Header RAM-size code. MBC2 has its own small built-in RAM; see below. |
+
+With MBC2, the CPU sees a fixed ROM window at `0x0000-0x3FFF` and a banked ROM window at `0x4000-0x7FFF`. The cartridge's RAM is the small MBC2 nibble RAM at `0xA000-0xA1FF` (512 four-bit cells); it is not a general 8 KiB SRAM. MBC2 bank selection is controlled by writes in the `0x2000-0x3FFF` range. Keep a bank number alongside any CPU address in `0x4000-0x7FFF` when documenting code or data there.
+
+## CPU address spaces
+
+These are hardware address windows, not interpretations of game variables:
+
+| CPU address range | Hardware use |
+|---|---|
+| `0x0000-0x7FFF` | Cartridge ROM and MBC control writes. |
+| `0x8000-0x9FFF` | Video RAM (tile/map data while in use). |
+| `0xA000-0xBFFF` | Cartridge RAM window; for this MBC2 cartridge, only `0xA000-0xA1FF` is the MBC2 RAM area. |
+| `0xC000-0xDFFF` | Work RAM. `0xE000-0xFDFF` echoes this region. |
+| `0xFE00-0xFE9F` | Object attribute memory (sprite attributes). |
+| `0xFF00-0xFF7F` | Hardware I/O registers. |
+| `0xFF80-0xFFFE` | High RAM. |
+| `0xFFFF` | Interrupt enable register. |
+
+## Confirmed code landmarks
+
+Offsets below are ROM file offsets that are also CPU addresses in the fixed bank:
+
+| ROM offset / CPU address | Observation |
+|---|---|
+| `0x0000-0x003F` | Repeated short instruction sequences (`LD HL,imm16; ADD HL,DE; RET`) with immediate values 0 through 7. Their callers and purpose are not identified. |
+| `0x0040` | VBlank vector saves AF/BC/DE/HL and jumps to `0x039C`. |
+| `0x0048` | LCD STAT vector jumps to `0x0594`. |
+| `0x0050`, `0x0058`, `0x0060` | Timer, serial, and joypad vectors contain `RETI` (`0xD9`). |
+| `0x0100` | Reset entry jumps to `0x0150`. |
+| `0x0150` | Startup begins. It calls `0x0C95`, initializes SP to `0xCBFF`, clears `0xFF80-0xFFFE`, and clears work RAM `0xC000-0xDFFF`. It also initializes other locations and calls routines at `0x0C7D`, `0x0CA2`, `0x0CA7`, and `0x0CB6`. |
+| `0x01A4-0x01AD` | Startup writes `1` to `0x3FFF` (selecting ROM bank 1), then calls CPU address `0x5586`. In this call context that is physical ROM offset `0x05586`. |
+
+These are landmarks, not a complete disassembly. In particular, routine names and responsibilities have not yet been established. Other calls in startup include `0x047C`, `0x04F6`, and `0x0511`; these are candidates for the next control-flow tracing pass.
+
+## Bank inventory
+
+The ROM has eight physical banks. The character tables described below are in bank 5; other banks are not yet reliably classified by subsystem.
+
+| Physical bank | ROM file offsets |
+|---:|---|
+| 0 | `0x00000-0x03FFF` |
+| 1 | `0x04000-0x07FFF` |
+| 2 | `0x08000-0x0BFFF` |
+| 3 | `0x0C000-0x0FFFF` |
+| 4 | `0x10000-0x13FFF` |
+| 5 | `0x14000-0x17FFF` |
+| 6 | `0x18000-0x1BFFF` |
+| 7 | `0x1C000-0x1FFFF` |
+
+The title is the only clear long ASCII string found in the initial string scan. Most game text, graphics, maps, and audio are likely stored as encoded or packed binary, so a plain-text scan cannot locate them. Some early bank bytes look table-like (for example, bank 2 starts with little-endian values `0x404E`, `0x408E`, `0x40CE`), but those are not yet proven pointers or assigned to any asset.
+
+## Character stat and ability tables
+
+The right-margin annotations in [rc2.hex](./rc2.hex) identify these tables by matching values to known character stats at each level. All 8,192 rows of the dump were compared with the local ROM and their bytes matched. These are annotated identifications, not yet verified by tracing the game's table-reading code. All ranges below are inclusive physical ROM offsets in **bank 5**; subtract `0x10000` for the CPU address when bank 5 is selected.
+
+Each listed table has 16 entries, ordered as levels 1 through 16 according to the annotations and the repeating layout. Values are raw hexadecimal bytes, not decimal: e.g. `1E` is decimal 30. For multi-byte records, a slash separates fields within one level; spaces separate successive levels. The byte order and field labels follow the margin notes; uncertain fields are retained as such.
+
+### HP and MP by level
+
+These are contiguous single-byte tables: eight HP tables followed by eight MP tables. For example, Hero HP level 1 is `0x1E` at `0x17065`; level 16 is `0xFF` at `0x17074`.
+
+| Character | Stat | ROM range | Values for levels 1-16 (hex) |
+|---|---|---|---|
+| Hero | HP | `0x17065-0x17074` | `1E 2D 3C 4B 5A 69 78 87 96 A5 B4 C3 D2 E1 F0 FF` |
+| Pit | HP | `0x17075-0x17084` | `28 32 3C 46 50 5A 64 6E 73 78 7D 82 87 8C 91 96` |
+| Lane | HP | `0x17085-0x17094` | `3C 4B 5A 69 78 82 8C 96 9D A4 AB B2 B9 BE C3 C8` |
+| Kyle | HP | `0x17095-0x170A4` | `50 54 58 5C 64 6C 74 7C 88 94 A0 AC BC CC DC F0` |
+| Jude | HP | `0x170A5-0x170B4` | `32 37 3C 41 46 4B 50 55 5A 5F 64 69 6E 73 78 82` |
+| Lee | HP | `0x170B5-0x170C4` | `78 82 8C 96 A0 A8 B0 B8 C0 C6 CC D0 D4 D6 D8 DC` |
+| Lora | HP | `0x170C5-0x170D4` | `50 5A 64 78 82 8C 96 AA B4 BE C8 D2 DC E6 F0 FF` |
+| Zold | HP | `0x170D5-0x170E4` | `B4 B9 BE C3 C8 CD D2 D7 DC E1 E6 EB F0 F5 FA FF` |
+| Hero | MP | `0x170E5-0x170F4` | `0A 14 1E 28 32 3C 46 50 5A 64 6E 78 82 8C 96 A0` |
+| Pit | MP | `0x170F5-0x17104` | `28 2E 34 3A 40 46 4C 52 56 5C 62 68 6E 74 7A 82` |
+| Lane | MP | `0x17105-0x17114` | `14 19 1E 23 28 2D 32 37 3C 41 46 50 5A 64 6E 78` |
+| Kyle | MP | `0x17115-0x17124` | `28 32 3C 46 50 5A 64 6E 73 78 7D 82 87 8C 91 96` |
+| Jude | MP | `0x17125-0x17134` | `64 66 68 6C 72 78 80 88 8E 96 A0 AA B4 BE C8 C8` |
+| Lee | MP | `0x17135-0x17144` | `14 1A 20 26 2C 32 38 3E 46 4E 56 5E 66 6E 76 82` |
+| Lora | MP | `0x17145-0x17154` | `50 5A 64 6E 73 78 7D 82 87 8C 91 96 9B A0 AA B4` |
+| Zold | MP | `0x17155-0x17164` | `32 3C 46 50 5A 64 6E 78 82 8C 96 A0 AA B4 BE C8` |
+
+### Attacks and abilities by level
+
+| Character / ability | Fields in byte order | ROM range | Values for levels 1-16 (hex) |
+|---|---|---|---|
+| Hero A | damage | `0x15449-0x15458` | `07 0F 17 1F 27 2F 37 3F 47 4F 57 5F 67 6F 77 7F` |
+| Hero B | cost / range / damage | `0x15459-0x15488` | `01/09/0F 01/09/10 01/09/11 01/09/12 01/0A/14 01/0A/16 01/0A/18 01/0B/1C 01/0B/20 01/0B/24 01/0C/28 01/0C/2C 01/0C/32 01/0D/38 01/0D/3E 00/0D/44` |
+| Pit dagger | range / damage | `0x154AD-0x154CC` | `08/01 08/02 09/04 09/06 0A/08 0A/0A 0B/0E 0B/12 0C/16 0C/1A 0D/1E 0D/22 0E/26 0E/2A 0F/2E 0F/32` |
+| Pit boomerang | range / damage | `0x154DF-0x154FE` | `08/0F 08/13 08/17 09/1B 09/1F 09/23 0A/27 0A/2B 0A/2F 0B/33 0B/37 0B/3B 0C/3F 0C/43 0C/47 0D/4F` |
+| Pit bomb | cost / damage / unknown | `0x15511-0x15540` | `08/3F/10 08/3F/10 08/3F/10 08/3F/10 06/4F/0C 06/4F/0C 06/4F/0C 06/4F/0C 04/5F/08 04/5F/08 04/5F/08 02/5F/08 02/6F/04 02/6F/04 01/6F/04 00/7F/02` |
+| Lane A | damage | `0x15709-0x15718` | `13 17 1B 1F 23 27 2B 2F 35 3B 41 47 4F 57 5F 67` |
+| Lane shield | cost / unknown | `0x15719-0x15738` | `14/28 15/32 16/3C 17/46 18/50 19/5A 1A/64 1B/6E 1C/78 1D/82 1E/8C 20/96 22/A0 24/AA 26/B4 28/BE` |
+| Lane healing | cost / damage / damage, per note | `0x15799-0x157C8` | `14/0A/0A 14/0A/0A 14/0F/0F 14/0F/0F 14/14/14 14/14/14 14/19/19 14/19/19 14/1E/1E 14/1E/1E 14/23/23 14/23/23 14/28/28 14/28/28 14/2D/2D 14/32/32` |
+| Kyle A | damage | `0x157C9-0x157D8` | `33 37 3B 3F 43 47 4B 4F 53 57 5B 5F 63 67 6B 6F` |
+| Kyle play dead | cost / unknown | `0x157D9-0x157F8` | `14/50 13/5A 12/64 11/6E 10/78 0F/82 0E/8C 0D/96 0C/A0 0B/AA 0A/B4 09/BE 07/C8 05/D2 03/DC 01/E6` |
+| Kyle rod | cost / damage | `0x15898-0x158B7` | `0A/B3 0A/B7 0A/BB 0A/BF 08/C3 08/C7 08/CB 08/CF 06/D3 06/D7 06/DB 06/DF 04/E3 04/E7 02/EB 02/EF` |
+| Jude weak A | range / damage | `0x159B2-0x159D1` | `08/0F 08/11 09/13 09/15 0A/17 0A/19 0B/1D 0B/21 0C/25 0C/29 0D/2D 0D/33 0E/39 0E/3F 0F/45 0F/4B` |
+| Jude strong A | range / damage | `0x159E4-0x15A03` | `08/2F 08/31 08/33 08/35 09/37 09/39 09/3B 09/3D 0A/3F 0A/41 0A/45 0A/49 0B/4D 0B/51 0B/55 0B/59` |
+| Jude quake | cost / damage | `0x15A16-0x15A35` | `32/87 32/8F 2D/97 2D/9F 28/A7 28/AF 23/B7 23/BF 1E/C7 1E/CF 19/D7 19/DF 14/E7 0F/EF 0A/F7 05/FF` |
+| Lee A | damage | `0x15B97-0x15BA6` | `2F 33 37 3B 3F 43 47 4B 4F 53 57 5B 5F 67 6F 77` |
+| Lee rapidfire | cost / damage | `0x15BA7-0x15BC6` | `04/3F 04/43 04/47 04/4B 03/4F 03/53 03/57 03/5B 02/5F 02/63 02/67 02/6B 01/6F 01/73 01/77 01/7B` |
+| Lee firework | cost / damage / range | `0x15BC7-0x15BF6` | `0F/3F/04 0F/43/04 0F/47/04 0F/4B/04 0F/4F/04 0F/53/04 0F/57/05 0F/5B/05 0F/5F/05 0F/63/05 0F/67/06 0F/6B/06 0F/6F/06 0F/73/07 0F/77/07 0F/7B/08` |
+| Lora A | range / damage | `0x15C34-0x15C53` | `07/3F 07/43 08/47 08/4B 09/4F 09/53 0A/57 0A/5B 0B/5F 0B/63 0C/67 0C/6B 0D/6F 0D/73 0E/7B 0E/7F` |
+| Lora heal | cost / damage / damage (uncertain) | `0x15C66-0x15C95` | `08/14/14 0C/16/16 10/18/18 14/1A/1A 18/1C/1C 1C/1E/1E 20/20/20 24/22/22 28/24/24 2C/26/26 30/28/28 34/2A/2A 38/2C/2C 3C/2E/2E 40/30/30 44/32/32` |
+| Lora wing | cost | `0x15C96-0x15CA5` | `0F 0E 0D 0C 0B 0A 09 08 07 06 05 04 03 02 01 00` |
+| Zold A | range / damage | `0x15CB6-0x15CD5` | `0A/87 0A/8F 0A/97 0A/9F 0B/A7 0B/AF 0B/B7 0B/BF 0C/C7 0C/CF 0C/D7 0C/DF 0D/E7 0D/EF 0D/F7 0D/FF` |
+| Zold B | cost / damage | `0x15CE8-0x15D07` | `14/97 14/9F 14/A7 14/AF 14/B7 14/BF 14/C7 14/CF 14/D3 14/D7 14/DB 14/DF 14/E3 14/E7 14/EB 14/EF` |
+
+**Boundary and interpretation caveats:**
+
+- Lane's shield annotation ends with `0F 31`, but the 16 cost/unknown pairs starting at `0x15719` end with `28 BE` at `0x15738`; `0F 31` occurs at `0x1573D-0x1573E`. The range above follows the 16-entry layout, not the annotated end marker.
+- The Lane healing annotation ends `32 32 14`, and the Kyle A annotation begins `[ 32 ...`. With 16 three-byte healing records, Lane ends in `14 32 32` at `0x157C6-0x157C8`, and 16 Kyle A values then start with `33` at `0x157C9`. The annotated `32` would overlap Lane's final record. The boundary needs code or gameplay verification.
+- Kyle's play-dead annotation identifies cost but does not explain the second byte. Lane and Lora healing notes use “damage” for the repeated values; whether those fields mean healing, damage, or another quantity is not established.
+- Range, cost, damage, and level assignments are the notes' interpretations. No consuming routine has been traced yet, and the unknown bytes and any scaling or special values remain to be verified.
+
+## What is and is not mapped yet
+
+| Subsystem | Current mapping |
+|---|---|
+| Engine / startup | Entry point, interrupt-vector targets, startup range, and several called CPU addresses are identified above. Most routines still need disassembly and naming. |
+| Runtime variables / character state | CPU addresses and the code that updates them are not yet established. See the separate save analysis for observed saved fields. |
+| Character templates / stats | HP, MP, attack, and ability tables are identified from the annotated dump in bank 5 above; consumers and some field meanings/boundaries remain to be verified. Other character data is not yet located. |
+| Maps / collision / encounters | No ROM file offsets or table format confirmed. |
+| Text / character graphics | The title is at `0x0134-0x0143`; dialogue/text tables and font/tile data are not located. |
+| Audio / music / sound effects | No code or data ranges identified yet. Game Boy sound registers are in `0xFF10-0xFF3F`, but that hardware fact does not identify the ROM routines or music data. |
+
+## Next steps to turn this into a byte-level map
+
+1. Disassemble from the confirmed vectors and startup entry, tracking the active MBC2 ROM bank at each call and data read.
+2. Follow pointers and callers into banks 1-7; distinguish code, pointer tables, graphics/tilemaps, map/collision data, text, and audio by their consumers and decoding routines before assigning names.
+3. Use an emulator debugger to connect observed saved fields to live RAM addresses and ROM read/write routines.
+4. Add each variable or asset range with the evidence used to identify it (write site, read site, pointer, controlled change, or decoded output).

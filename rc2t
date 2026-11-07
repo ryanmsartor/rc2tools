@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROM_NAME="Rolan's Curse II (USA).gb"
+
+rc2t_print_help_message() {
+    echo ""
+    echo "Usage: $(basename "$0") <command>"
+    echo ""
+    echo "Commands:"
+    echo "  dump-hex      Dump the contents in hexadecimal"
+    echo "  check-hash    Check the hash"
+}
+
+_check_if_rom_exists() {
+    if [ ! -f input/"$ROM_NAME" ]; then
+        echo "Error: ROM file '$ROM_NAME' not found."
+        exit 1
+    fi
+}
+
+_get_hash() {
+    sha256sum "input/$ROM_NAME" | awk '{print $1}'
+}
+
+##### MAIN #####
+
+cd "$(dirname "$0")"
+
+if [ $# -eq 0 ] || [ -z "$1" ]; then
+    rc2t_print_help_message
+    exit 1
+fi
+
+case "$1" in
+    check-hash)
+        _check_if_rom_exists
+        _get_hash
+        ;;
+
+    dump-hex)
+        _check_if_rom_exists
+        xxd "input/$ROM_NAME" > "output/$ROM_NAME.hex"
+        ;;
+
+    *)
+        rc2t_print_help_message
+        ;;
+esac

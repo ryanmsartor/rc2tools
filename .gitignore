@@ -2,3 +2,4 @@
 !/input/.gitkeep
 /output/*
 !/output/.gitkeep
+/docs/rc2.hex
