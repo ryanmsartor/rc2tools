@@ -8,9 +8,10 @@ rc2t_print_help_message() {
     echo "Usage: $(basename "$0") <command>"
     echo ""
     echo "Commands:"
-    echo "  dump-hex      Dump the contents in hexadecimal"
-    echo "  check-hash    Check the hash"
-    echo "  extract-json [rom-or-hex]  Extract character stats into output/<rom-sha256>.json"
+    echo "  dump-hex        Dump the contents in hexadecimal"
+    echo "  check-hash      Check the hash"
+    echo "  extract-json    [rom-or-hex]  Extract character stats into output/<rom-sha256>.json"
+    echo "  render-graphics [start end output [options]]  Render ROM tiles (default: entire ROM)"
 }
 
 _check_if_rom_exists() {
@@ -50,6 +51,14 @@ case "$1" in
             exit 1
         fi
         python3 bin/extract_json.py "${@:2}"
+        ;;
+
+    render-graphics)
+        if [ "$#" -eq 1 ]; then
+            python3 bin/render_graphics.py 0 0x20000 output/graphics.png
+        else
+            python3 bin/render_graphics.py "${@:2}"
+        fi
         ;;
 
     *)

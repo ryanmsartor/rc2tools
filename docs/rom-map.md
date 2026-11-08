@@ -51,7 +51,7 @@ These are landmarks, not a complete disassembly. In particular, routine names an
 
 ## Bank inventory
 
-The ROM has eight physical banks. The character tables described below are in bank 5; other banks are not yet reliably classified by subsystem.
+The ROM has eight physical banks. The character tables described below are in bank 5. A graphics/tile-data region and related descriptors have been tentatively identified in bank 2; details and confidence are documented below. Other banks are not yet reliably classified by subsystem.
 
 | Physical bank | ROM file offsets |
 |---:|---|
@@ -65,6 +65,65 @@ The ROM has eight physical banks. The character tables described below are in ba
 | 7 | `0x1C000-0x1FFFF` |
 
 The title is the only clear long ASCII string found in the initial string scan. Most game text, graphics, maps, and audio are likely stored as encoded or packed binary, so a plain-text scan cannot locate them. Some early bank bytes look table-like (for example, bank 2 starts with little-endian values `0x404E`, `0x408E`, `0x40CE`), but those are not yet proven pointers or assigned to any asset.
+
+## Graphics and tile data (preliminary)
+
+The following identification is based on decoding bytes as Game Boy 2bpp tiles and matching a Hero sprite in `docs/screenshot_1.png`. The tile match confirms the format and the listed sprite tiles; the surrounding descriptor tables look like graphics transfer lists, but their consuming code has not been traced. Treat their field meanings as tentative.
+
+All source ranges below are physical ROM offsets in **bank 2**. For a CPU source pointer in the banked window, add `0x4000` to obtain the physical offset; conversely, subtract `0x4000` from the physical offset to obtain the CPU address with bank 2 selected. Each uncompressed 2bpp tile is 16 bytes (8×8 pixels).
+
+### Hero sprite tiles
+
+The four tiles matching the screenshot are consecutive 16-byte tiles at `0x9106-0x9145` (inclusive). Their file order is column-first, not row-first:
+
+| Screen position | Physical ROM range | CPU address (bank 2 selected) |
+|---|---|---|
+| Top-left | `0x9106-0x9115` | `0x5106-0x5115` |
+| Bottom-left | `0x9116-0x9125` | `0x5116-0x5125` |
+| Top-right | `0x9126-0x9135` | `0x5126-0x5135` |
+| Bottom-right | `0x9136-0x9145` | `0x5136-0x5145` |
+
+Thus the on-screen arrangement is:
+
+| | Left | Right |
+|---|---|---|
+| Top | `0x9106` | `0x9126` |
+| Bottom | `0x9116` | `0x9136` |
+
+The top-right tile at `0x9126` was an exact 2bpp match; the other three tiles also match the screenshot's opaque pixels when transparent tile color 0 is allowed to show the background through. The top-left tile bytes also recur at `0x9146`; the four addresses above are supported as one sprite by the consecutive tile layout and the matches of all four quadrants.
+
+### Main bank-2 tile-data batch
+
+A sequence of eight 8-byte records at `0x9024-0x9063` appears to contain a length, a bank-2 CPU source address, a VRAM destination (`0x8000` in each record), and two zero bytes. Interpreting those fields this way yields eight contiguous source ranges:
+
+| Record ROM offset | Length | CPU source (bank 2) | Physical ROM range | Tile count |
+|---|---:|---:|---|---:|
+| `0x9024` | `0x0500` | `0x5106` | `0x9106-0x9605` | 80 |
+| `0x902C` | `0x0440` | `0x5606` | `0x9606-0x9A45` | 68 |
+| `0x9034` | `0x0380` | `0x5A46` | `0x9A46-0x9DC5` | 56 |
+| `0x903C` | `0x0540` | `0x5DC6` | `0x9DC6-0xA305` | 84 |
+| `0x9044` | `0x04C0` | `0x6306` | `0xA306-0xA7C5` | 76 |
+| `0x904C` | `0x0500` | `0x67C6` | `0xA7C6-0xACC5` | 80 |
+| `0x9054` | `0x0420` | `0x6CC6` | `0xACC6-0xB0E5` | 66 |
+| `0x905C` | `0x0480` | `0x70E6` | `0xB0E6-0xB565` | 72 |
+
+Together these occupy `0x9106-0xB565` inclusive (`0x2460` bytes, 582 tiles). The sprite's four tiles are at the start of the first range. The ranges are multiples of 16 bytes and meet exactly end-to-start; this supports, but does not by itself prove, their interpretation as tile data.
+
+### Related graphics descriptors and source ranges
+
+The 6-byte records at `0x9064-0x90B1` appear to encode a byte length, bank-2 CPU source address, and VRAM destination. A zero word at `0x90B2` terminates this list. The source pointers resolve to the main batch above or to these additional bank-2 ranges:
+
+| CPU source (bank 2) | Physical ROM range | Length |
+|---|---|---:|
+| `0x7606` | `0xB606-0xB705` | `0x0100` |
+| `0x7706` | `0xB706-0xB725` | `0x0020` |
+| `0x7726` | `0xB726-0xB885` | `0x0160` |
+| `0x7886` | `0xB886-0xB985` | `0x0100` |
+| `0x7986` | `0xB986-0xBB05` | `0x0180` |
+
+This puts related referenced data as far as `0xBB05`; it is not evidence that all graphics in the game end there. Additional zero-terminated 6-byte-record lists occur at `0x90B4-0x90E3` and `0x90E6-0x9103`. They reuse source pointers from the ranges above and the main batch. Some 16-bit first fields in these lists have their high bit set (for example, `0x8180` and `0x80A0`), so the simple length interpretation may not apply to every record. The record layouts, flags, and actual loader behavior remain unverified.
+
+The `./rc2t render-graphics` command groups every four consecutive tiles in a supplied range into a 16×16 image, using the observed column-first order (top-left, bottom-left, top-right, bottom-right). For example, `./rc2t render-graphics 0x9106 0xB566 output/graphics.png` renders the main batch as an experimental sprite sheet. This uniform grouping is intended to help spot other sprites; it does not reconstruct the game's actual sprite/tile maps or palettes. An incomplete final group is padded with blank quadrants.
 
 ## Character stat and ability tables
 
@@ -156,7 +215,7 @@ Fixed-bank code at `0x009DE-0x009EB` loads one of these table bases (`0x7165` or
 | Runtime variables / character state | CPU addresses and the code that updates them are not yet established. See the separate save analysis for observed saved fields. |
 | Character templates / stats | HP, MP, attack, and ability tables are identified from the annotated dump in bank 5 above; consumers and some field meanings/boundaries remain to be verified. Other character data is not yet located. |
 | Maps / collision / encounters | No ROM file offsets or table format confirmed. |
-| Text / character graphics | The title is at `0x0134-0x0143`; dialogue/text tables and font/tile data are not located. |
+| Text / character graphics | The title is at `0x0134-0x0143`; a preliminary bank-2 tile-data batch and matching four-tile Hero sprite are documented above. Dialogue/text tables, font data, tile maps, palettes, and the loader that consumes the graphics descriptors remain unidentified. |
 | Audio / music / sound effects | No code or data ranges identified yet. Game Boy sound registers are in `0xFF10-0xFF3F`, but that hardware fact does not identify the ROM routines or music data. |
 
 ## Next steps to turn this into a byte-level map
