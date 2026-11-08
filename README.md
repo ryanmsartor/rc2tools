@@ -81,3 +81,17 @@ file is overwritten if it exists. You can also invoke
 `python3 bin/render_graphics.py` directly with the same range, output path,
 and options. When run without a range, `./rc2t render-graphics` applies this
 grouping to the entire ROM, including non-graphics data.
+
+## Swap character sprites
+
+To create an IPS patch that swaps two characters' nine standard poses, defeat
+sprite, and level-up face, run:
+
+```sh
+./rc2t swap-character-sprite hero pit
+```
+
+This writes `output/swap-hero-pit-sprites.ips`, using the default ROM. Character
+names are `hero`, `pit`, `lane`, `kyle`, `jude`, `lee`, `lora`, and `zold`.
+When `input/Rolan's Curse II (USA).gb` is present and valid, the command also
+writes the fully patched ROM to `output/swap-hero-pit-sprites.gb`.

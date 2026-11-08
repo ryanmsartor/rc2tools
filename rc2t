@@ -12,6 +12,7 @@ rc2t_print_help_message() {
     echo "  check-hash      Check the hash"
     echo "  extract-json    [rom-or-hex]  Extract character stats into output/<rom-sha256>.json"
     echo "  render-graphics [start [end output]] [options]  Render ROM tiles (default: entire ROM)"
+    echo "  swap-character-sprite <character1> <character2>  Write an IPS sprite-swap patch"
 }
 
 _check_if_rom_exists() {
@@ -63,6 +64,10 @@ case "$1" in
         else
             python3 bin/render_graphics.py "${@:2}"
         fi
+        ;;
+
+    swap-character-sprite)
+        python3 bin/swap_character_sprite.py "${@:2}"
         ;;
 
     *)
