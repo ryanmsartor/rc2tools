@@ -40,7 +40,7 @@ class SwapCharacterSpriteWrapperTests(unittest.TestCase):
         self.assertTrue(patch.is_file())
         self.assertTrue(patch.read_bytes().startswith(b"PATCH"))
         self.assertTrue(patch.read_bytes().endswith(b"EOF"))
-        patched_rom = self.root / "output" / "swap-hero-pit-sprites.gb"
+        patched_rom = self.root / "output" / "Rolan's Curse II (USA) (hero-pit).gb"
         self.assertTrue(patched_rom.is_file())
         self.assertEqual(patched_rom.stat().st_size, 0x20000)
         patched_bytes = patched_rom.read_bytes()

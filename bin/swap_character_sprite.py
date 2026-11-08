@@ -88,7 +88,7 @@ def main() -> int:
 
     output_base = ROOT / "output" / f"swap-{args.character1}-{args.character2}-sprites"
     patch_output = output_base.with_suffix(".ips")
-    rom_output = output_base.with_suffix(".gb")
+    rom_output = ROOT / "output" / f"{ROM_PATH.stem} ({args.character1}-{args.character2}).gb"
     try:
         rom = read_rom(ROM_PATH)
         patch, patched_rom = build_swap_artifacts(rom, args.character1, args.character2)

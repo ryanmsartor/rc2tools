@@ -3,4 +3,5 @@
 /output/*
 !/output/.gitkeep
 /docs/rc2.hex
-/bin/__pycache__
+__pycache__/
+*.py[cod]

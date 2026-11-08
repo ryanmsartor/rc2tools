@@ -94,4 +94,4 @@ sprite, and level-up face, run:
 This writes `output/swap-hero-pit-sprites.ips`, using the default ROM. Character
 names are `hero`, `pit`, `lane`, `kyle`, `jude`, `lee`, `lora`, and `zold`.
 When `input/Rolan's Curse II (USA).gb` is present and valid, the command also
-writes the fully patched ROM to `output/swap-hero-pit-sprites.gb`.
+writes the fully patched ROM to `output/Rolan's Curse II (USA) (hero-pit).gb`.
