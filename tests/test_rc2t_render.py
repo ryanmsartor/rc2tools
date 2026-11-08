@@ -55,6 +55,27 @@ class RenderGraphicsWrapperTests(unittest.TestCase):
             self.assertEqual(image.size, (59, 32))
             self.assertEqual(image.getpixel((43, 16)), (85, 85, 85))
 
+    def test_highlight_known_works_with_default_full_rom_range(self):
+        result = self.run_wrapper("render-graphics", "--highlight-known", "--scale", "1")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        with Image.open(self.root / "output" / "graphics.png") as image:
+            colors = [color for _, color in image.getcolors(image.width * image.height)]
+            self.assertIn((0, 0, 255), colors)
+
+    def test_start_and_end_accept_highlight_known_without_output_path(self):
+        rom_path = self.root / "input" / "Rolan's Curse II (USA).gb"
+        rom = bytearray(rom_path.read_bytes())
+        rom[0x8040:0x8060] = bytes([0xFF, 0]) * 16
+        rom_path.write_bytes(rom)
+
+        result = self.run_wrapper(
+            "render-graphics", "0x8040", "0x8060", "--highlight-known", "--scale", "1",
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        with Image.open(self.root / "output" / "graphics.png") as image:
+            colors = [color for _, color in image.getcolors(image.width * image.height)]
+            self.assertIn((0, 0, 255), colors)
+
     def test_positional_tile_grid_renders_to_default_output(self):
         result = self.run_wrapper(
             "render-graphics", "0x1000", "0x1060", "2x3", "--scale", "1",

@@ -16,10 +16,17 @@ SPRITE_TILE_POSITIONS = ((0, 0), (0, 1), (1, 0), (1, 1))
 SPRITE_WIDTH = TILE_WIDTH * 2
 SPRITE_GUTTER = 1
 GUTTER_COLOR = (192, 192, 192)
+HIGHLIGHT_COLOR = (0, 0, 255)
 PORTRAIT_TILE_COLUMNS = 4
 PORTRAIT_TILE_COUNT = PORTRAIT_TILE_COLUMNS ** 2
 PORTRAIT_BYTES = PORTRAIT_TILE_COUNT * TILE_BYTES
 PORTRAIT_WIDTH = PORTRAIT_TILE_COLUMNS * TILE_WIDTH
+# Keep these exclusive physical-ROM ranges aligned with the graphics in docs/rom-map.md.
+KNOWN_GRAPHICS_RANGES = (
+    (0x5291, 0x5580),
+    (0x804E, 0x900E),
+    (0x9106, 0xB886),
+)
 DEFAULT_ROM = Path(__file__).resolve().parent.parent / "input" / "Rolan's Curse II (USA).gb"
 DEFAULT_PALETTE = (
     (0, 0, 0),
@@ -162,6 +169,7 @@ def render_tile_grid(
     palette: tuple[tuple[int, int, int], ...] = DEFAULT_PALETTE,
     start_address: int | None = None,
     tile_positions: tuple[tuple[int, int], ...] | None = None,
+    highlight_known: bool = False,
 ) -> Image.Image:
     """Render tiles grouped into fixed-size images, in row-major order by default."""
     if tile_columns < 1 or tile_rows < 1:
@@ -172,6 +180,8 @@ def render_tile_grid(
         raise ValueError("scale must be at least 1")
     if len(palette) != 4:
         raise ValueError("palette must contain exactly four colors")
+    if highlight_known and start_address is None:
+        raise ValueError("start address is required to highlight known graphics")
 
     tiles = decode_tiles(data)
     tiles_per_image = tile_columns * tile_rows
@@ -208,9 +218,34 @@ def render_tile_grid(
         tile_column, tile_row = tile_positions[tile_index_in_image]
         tile_x = image_column * (image_width + SPRITE_GUTTER) + tile_column * TILE_WIDTH
         tile_y = image_row * (image_height + SPRITE_GUTTER) + tile_row * TILE_WIDTH
+        tile_start = start_address + tile_index * TILE_BYTES if start_address is not None else 0
+        tile_data = data[tile_index * TILE_BYTES:(tile_index + 1) * TILE_BYTES].ljust(
+            TILE_BYTES, b"\x00"
+        )
         for y, row in enumerate(tile):
+            low_byte, high_byte = tile_data[y * 2:y * 2 + 2]
+            row_address = tile_start + y * 2
+            low_known = highlight_known and any(
+                known_start <= row_address < known_end
+                for known_start, known_end in KNOWN_GRAPHICS_RANGES
+            )
+            high_known = highlight_known and any(
+                known_start <= row_address + 1 < known_end
+                for known_start, known_end in KNOWN_GRAPHICS_RANGES
+            )
             for x, color in enumerate(row):
-                pixels[tile_x + x, tile_y + y] = palette[color]
+                bit_mask = 1 << (7 - x)
+                if low_known and high_known:
+                    highlight_pixel = True
+                elif low_known:
+                    highlight_pixel = bool(low_byte & bit_mask) and not (high_byte & bit_mask)
+                elif high_known:
+                    highlight_pixel = bool(high_byte & bit_mask) and not (low_byte & bit_mask)
+                else:
+                    highlight_pixel = False
+                pixels[tile_x + x, tile_y + y] = (
+                    HIGHLIGHT_COLOR if highlight_pixel else palette[color]
+                )
 
     if scale > 1:
         image = image.resize((image.width * scale, image.height * scale), Image.Resampling.NEAREST)
@@ -234,6 +269,7 @@ def render_sprites(
     scale: int = 4,
     palette: tuple[tuple[int, int, int], ...] = DEFAULT_PALETTE,
     start_address: int | None = None,
+    highlight_known: bool = False,
 ) -> Image.Image:
     """Render groups of four column-first tiles as 16x16 sprites."""
     return render_tile_grid(
@@ -245,6 +281,7 @@ def render_sprites(
         palette,
         start_address,
         tile_positions=SPRITE_TILE_POSITIONS,
+        highlight_known=highlight_known,
     )
 
 
@@ -254,6 +291,7 @@ def render_portraits(
     scale: int = 4,
     palette: tuple[tuple[int, int, int], ...] = PORTRAIT_PALETTE,
     start_address: int | None = None,
+    highlight_known: bool = False,
 ) -> Image.Image:
     """Render complete 32x32 portraits from row-major 4x4 tile blocks."""
     if len(data) % PORTRAIT_BYTES:
@@ -266,6 +304,7 @@ def render_portraits(
         scale,
         palette,
         start_address,
+        highlight_known=highlight_known,
     )
 
 
@@ -291,6 +330,11 @@ def main() -> int:
         type=parse_tile_grid,
         metavar="WIDTHxHEIGHT",
         help="combine this many tiles across and down into each image",
+    )
+    parser.add_argument(
+        "--highlight-known",
+        action="store_true",
+        help="paint tiles overlapping documented sprite areas solid blue",
     )
     parser.add_argument(
         "--columns",
@@ -323,13 +367,26 @@ def main() -> int:
                 args.scale,
                 palette,
                 args.start,
+                highlight_known=args.highlight_known,
             )
         elif args.mode == "portraits":
             columns = args.columns if args.columns is not None else 4
-            image = render_portraits(data, columns, args.scale, start_address=args.start)
+            image = render_portraits(
+                data,
+                columns,
+                args.scale,
+                start_address=args.start,
+                highlight_known=args.highlight_known,
+            )
         else:
             columns = args.columns if args.columns is not None else 16
-            image = render_sprites(data, columns, args.scale, start_address=args.start)
+            image = render_sprites(
+                data,
+                columns,
+                args.scale,
+                start_address=args.start,
+                highlight_known=args.highlight_known,
+            )
         args.output.parent.mkdir(parents=True, exist_ok=True)
         image.save(args.output)
     except (OSError, UnicodeError, ValueError) as error:

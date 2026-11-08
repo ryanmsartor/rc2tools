@@ -12,6 +12,7 @@ rc2t_print_help_message() {
     echo "  check-hash      Check the hash"
     echo "  extract-json    [rom-or-hex]  Extract character stats into output/<rom-sha256>.json"
     echo "  render-graphics [start [end [WxH|output]]] [options]  Render ROM tiles (default: entire ROM)"
+    echo "    --highlight-known  Paint documented sprite tiles solid blue"
     echo "  swap-character-sprite <character1> <character2>  Swap sprites and POW portraits"
 }
 
@@ -57,12 +58,18 @@ case "$1" in
     render-graphics)
         if [ "$#" -eq 1 ]; then
             python3 bin/render_graphics.py 0 0x20000 output/graphics.png
+        elif [[ "$2" == --* ]]; then
+            python3 bin/render_graphics.py 0 0x20000 output/graphics.png "${@:2}"
         elif [ "$#" -eq 2 ]; then
             python3 bin/render_graphics.py "$2" 0x20000 output/graphics.png
         elif [ "$#" -ge 3 ] && [[ "$3" =~ ^0*[1-9][0-9]*[xX][0-9]+$ ]]; then
             python3 bin/render_graphics.py "$2" 0x20000 output/graphics.png --tile-grid "$3" "${@:4}"
         elif [[ "$3" == --* ]]; then
             python3 bin/render_graphics.py "$2" 0x20000 output/graphics.png "${@:3}"
+        elif [ "$#" -eq 3 ]; then
+            python3 bin/render_graphics.py "$2" "$3" output/graphics.png
+        elif [ "$#" -ge 4 ] && [[ "$4" == --* ]]; then
+            python3 bin/render_graphics.py "$2" "$3" output/graphics.png "${@:4}"
         elif [ "$#" -ge 4 ] && [[ "$4" =~ ^0*[1-9][0-9]*[xX][0-9]+$ ]]; then
             python3 bin/render_graphics.py "$2" "$3" output/graphics.png --tile-grid "$4" "${@:5}"
         else

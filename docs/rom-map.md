@@ -394,6 +394,83 @@ The sequence beginning at `0xB0E6` starts with Zold's nine standard movement and
 
 The sequence occupies `0xB0E6-0xB565` inclusive (`0x480` bytes, or 18 sprite-equivalents). The next address is `0xB566` (CPU address `0x7566` with bank 2 selected).
 
+### Numeric and HUD glyph tiles
+
+The 16-byte tiles immediately following Zold's sprites render as single 8×8 characters or HUD marks. The first 12 tiles are digits `0` through `9`, followed by `H` and `P`; the next four are `M`, another `P`, the arrow at the start of the MP gauge, and a forward slash.
+
+| Physical ROM range | Contents |
+|---|---|
+| `0xB566-0xB575` | `0` |
+| `0xB576-0xB585` | `1` |
+| `0xB586-0xB595` | `2` |
+| `0xB596-0xB5A5` | `3` |
+| `0xB5A6-0xB5B5` | `4` |
+| `0xB5B6-0xB5C5` | `5` |
+| `0xB5C6-0xB5D5` | `6` |
+| `0xB5D6-0xB5E5` | `7` |
+| `0xB5E6-0xB5F5` | `8` |
+| `0xB5F6-0xB605` | `9` |
+| `0xB606-0xB615` | `H` |
+| `0xB616-0xB625` | `P` |
+| `0xB626-0xB635` | `M` |
+| `0xB636-0xB645` | `P` |
+| `0xB646-0xB655` | Arrow marking the start of the MP gauge |
+| `0xB656-0xB665` | Forward slash (`/`) |
+
+This sequence occupies `0xB566-0xB665` inclusive (16 tiles) and ends immediately before `0xB666`. Its last six tiles (`0xB606-0xB665`) fall within the broader descriptor source range `0xB606-0xB705` listed below; that source-range overlap does not conflict with the visual glyph identification.
+
+### MP gauge, controls, cursors, and text-box tiles
+
+The next 26 single-tile graphics begin at `0xB666`. They include MP-gauge states, button icons, UI markers, and pieces of a text-box border. The two special top-middle variants and the final text-box tile's intended exact use have not been identified.
+
+| Physical ROM range | Contents |
+|---|---|
+| `0xB666-0xB675` | Two full MP bars |
+| `0xB676-0xB685` | One full and one empty MP bar |
+| `0xB686-0xB695` | Two empty MP bars |
+| `0xB696-0xB6A5` | One full MP bar |
+| `0xB6A6-0xB6B5` | One empty MP bar |
+| `0xB6B6-0xB6C5` | A-button icon |
+| `0xB6C6-0xB6D5` | B-button icon |
+| `0xB6D6-0xB6E5` | Rectangle, variant 1 |
+| `0xB6E6-0xB6F5` | Rectangle, variant 2 |
+| `0xB6F6-0xB705` | Rectangle, variant 3 |
+| `0xB706-0xB715` | Rightward cursor |
+| `0xB716-0xB725` | Downward cursor |
+| `0xB726-0xB735` | Period |
+| `0xB736-0xB745` | Thin forward slash |
+| `0xB746-0xB755` | Hyphen |
+| `0xB756-0xB765` | Text-box top-left corner |
+| `0xB766-0xB775` | Text-box top-middle segment |
+| `0xB776-0xB785` | Text-box top-right corner |
+| `0xB786-0xB795` | Text-box bottom-left corner |
+| `0xB796-0xB7A5` | Text-box bottom-middle segment |
+| `0xB7A6-0xB7B5` | Text-box bottom-right corner |
+| `0xB7B6-0xB7C5` | Text-box left-middle segment |
+| `0xB7C6-0xB7D5` | Text-box right-middle segment |
+| `0xB7D6-0xB7E5` | Special top-middle segment, variant 1; usage unclear |
+| `0xB7E6-0xB7F5` | Special top-middle segment, variant 2; usage unclear |
+| `0xB7F6-0xB805` | Special bottom-middle segment with a downward cursor, indicating more text |
+
+These tiles occupy `0xB666-0xB805` inclusive (26 tiles). They fall within the descriptor source ranges `0xB606-0xB705`, `0xB706-0xB725`, and `0xB726-0xB885` listed below. The descriptor ranges identify broader data blocks; exact transfer behavior and screen usage have not been traced.
+
+### POW portrait frame and level marker tiles
+
+The eight tiles from `0xB806` through `0xB885` continue the single-tile UI graphics. They contain a small rightward cursor, the corners and solid side segment of the frame around the POW portraits, and the two-tile `LV.` marker.
+
+| Physical ROM range | Contents |
+|---|---|
+| `0xB806-0xB815` | Small rightward cursor |
+| `0xB816-0xB825` | POW portrait frame, top-left corner |
+| `0xB826-0xB835` | POW portrait frame, top-right corner |
+| `0xB836-0xB845` | POW portrait frame, bottom-left corner |
+| `0xB846-0xB855` | POW portrait frame, bottom-right corner |
+| `0xB856-0xB865` | Solid side segment of the POW portrait frame |
+| `0xB866-0xB875` | `LV.` marker, first tile |
+| `0xB876-0xB885` | `LV.` marker, second tile |
+
+This ends the documented run of single-tile graphics at `0xB886`; larger sprite graphics follow.
+
 ### Main bank-2 tile-data batch
 
 A sequence of eight 8-byte records at `0x9024-0x9063` appears to contain a length, a bank-2 CPU source address, a VRAM destination (`0x8000` in each record), and two zero bytes. Interpreting those fields this way yields eight contiguous source ranges:

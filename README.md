@@ -71,6 +71,22 @@ assembled sprites, pass the range and output path:
 ./rc2t render-graphics 0x9106 0xB566 output/hero-sprites.png
 ```
 
+Pass `--highlight-known` to paint documented graphics blue, making unmapped
+tiles easier to spot:
+
+```sh
+./rc2t render-graphics --highlight-known
+./rc2t render-graphics 0x9100 0x9200 output/scan.png --highlight-known
+```
+
+The highlighted physical-ROM ranges follow the graphics documented in
+[the ROM map](./docs/rom-map.md). Highlighting follows the known byte ranges,
+even when a range starts or ends inside a rendered tile. A pixel is blue when
+its color data comes only from bytes inside a known range; if only one of a
+tile row's two bitplane bytes is known, only pixels attributable to that byte
+are blue. Portrait, sprite, and custom tile-grid layouts all use the same
+ranges.
+
 Offsets are physical ROM offsets. Each 16-byte tile is decoded as 8×8 pixels;
 every four consecutive tiles are assembled into one 16×16 sprite in
 top-left, bottom-left, top-right, bottom-right input order. This column-first
@@ -104,8 +120,9 @@ non-transparent palette displays index 3 as white. Portrait mode uses the
 grayscale palette observed on the POW screen.
 The output extension can be `.png`, `.jpg`, or `.jpeg`. Options include
 `--input` for a different ROM or full hex dump, `--columns` for images per
-row, and `--scale` for nearest-neighbor enlargement. The specified output
-file is overwritten if it exists. You can also invoke
+row, `--scale` for nearest-neighbor enlargement, and `--highlight-known` to
+mark documented sprite areas. The specified output file is overwritten if it
+exists. You can also invoke
 `python3 bin/render_graphics.py` directly with the same range, output path,
 and options. When run without a range, `./rc2t render-graphics` applies the
 default sprite grouping to the entire ROM, including non-graphics data.
