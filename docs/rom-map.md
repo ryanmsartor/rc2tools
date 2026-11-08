@@ -255,6 +255,79 @@ The sequence beginning at `0xA306` starts with nine standard movement and attack
 
 The sequence ends at `0xA7C5` inclusive; the next address is `0xA7C6` (CPU address `0x67C6` with bank 2 selected).
 
+### Lee animation, sai, fist, and firecracker sprites
+
+The sequence beginning at `0xA7C6` starts with Lee's nine standard movement and attack sprites in the same pose order as the other characters: two each idling down, up, and left, followed by one attack sprite facing down, up, and left. These are followed by Lee's sai and fist sprites, particle effects, firecracker effects, and defeated sprite.
+
+| Physical ROM range | Contents |
+|---|---|
+| `0xA7C6-0xA845` | Lee idling down (2 sprites) |
+| `0xA846-0xA8C5` | Lee idling up (2 sprites) |
+| `0xA8C6-0xA945` | Lee idling left (2 sprites) |
+| `0xA946-0xA985` | Lee attacking down |
+| `0xA986-0xA9C5` | Lee attacking up |
+| `0xA9C6-0xAA05` | Lee attacking left |
+| `0xAA06-0xAA45` | Lee's sai facing down |
+| `0xAA46-0xAA85` | Lee's sai facing up |
+| `0xAA86-0xAAC5` | Lee's sai facing left |
+| `0xAAC6-0xAB05` | Lee's fists facing down |
+| `0xAB06-0xAB45` | Lee's fists facing up |
+| `0xAB46-0xAB85` | Lee's fists facing left |
+| `0xAB86-0xABC5` | Two particle effects and the first two disjointed pieces of Lee's firecracker move |
+| `0xABC6-0xAC65` | Two and a half sprite-equivalents of additional firecracker effects; orientations are unclear in the current visualization |
+| `0xAC66-0xAC85` | Half-sprite of full transparency |
+| `0xAC86-0xACC5` | Lee defeated |
+
+The sequence ends at `0xACC5` inclusive; the next address is `0xACC6` (CPU address `0x6CC6` with bank 2 selected).
+
+### Lora animation, arrow, and healing sprites
+
+The sequence beginning at `0xACC6` starts with Lora's nine standard movement and attack sprites in the same pose order as the other characters: two each idling down, up, and left, followed by one attack sprite facing down, up, and left. These are followed by two half-sprites of her arrow, three wing-unfolding frames, her body during the flight animation, the drop shadow and transparent quarters, a heart particle, and her defeated sprite.
+
+| Physical ROM range | Contents |
+|---|---|
+| `0xACC6-0xAD45` | Lora idling down (2 sprites) |
+| `0xAD46-0xADC5` | Lora idling up (2 sprites) |
+| `0xADC6-0xAE45` | Lora idling left (2 sprites) |
+| `0xAE46-0xAE85` | Lora attacking down |
+| `0xAE86-0xAEC5` | Lora attacking up |
+| `0xAEC6-0xAF05` | Lora attacking left |
+| `0xAF06-0xAF25` | Half-sprite of Lora's arrow facing down |
+| `0xAF26-0xAF45` | Half-sprite of Lora's arrow facing left; it appears split like Pit's and Jude's weak attacks |
+| `0xAF46-0xAF85` | Lora's wing-unfolding frame 1 |
+| `0xAF86-0xAFC5` | Lora's wing-unfolding frame 2 |
+| `0xAFC6-0xB005` | Lora's wing-unfolding frame 3 |
+| `0xB006-0xB045` | Lora's body during the flight animation |
+| `0xB046-0xB065` | Two quarter-sprites that combine into a ground drop shadow |
+| `0xB066-0xB085` | Two fully transparent quarter-sprites |
+| `0xB086-0xB095` | Quarter-sprite of the heart particle from Lora's healing animation |
+| `0xB096-0xB0A5` | Quarter-sprite of transparent space |
+| `0xB0A6-0xB0E5` | Lora defeated |
+
+The sequence occupies `0xACC6-0xB0E5` inclusive, a total of `0x420` bytes (16½ 64-byte sprite-equivalents). The next address is `0xB0E6` (CPU address `0x70E6` with bank 2 selected).
+
+### Zold animation, sword, and blade-wave sprites
+
+The sequence beginning at `0xB0E6` starts with Zold's nine standard movement and attack sprites in the same pose order as the other characters: two each idling down, up, and left, followed by one attack sprite facing down, up, and left. These are followed by Zold's sword, two half-sprites of blade waves, four unclear wave or bubble-effect sprites, and his defeated sprite.
+
+| Physical ROM range | Contents |
+|---|---|
+| `0xB0E6-0xB165` | Zold idling down (2 sprites) |
+| `0xB166-0xB1E5` | Zold idling up (2 sprites) |
+| `0xB1E6-0xB265` | Zold idling left (2 sprites) |
+| `0xB266-0xB2A5` | Zold attacking down |
+| `0xB2A6-0xB2E5` | Zold attacking up |
+| `0xB2E6-0xB325` | Zold attacking left |
+| `0xB326-0xB365` | Zold's sword facing down |
+| `0xB366-0xB3A5` | Zold's sword facing up |
+| `0xB3A6-0xB3E5` | Zold's sword facing left |
+| `0xB3E6-0xB405` | Half-sprite of Zold's downward blade wave, appearing split in two |
+| `0xB406-0xB425` | Half-sprite of Zold's left-facing blade wave |
+| `0xB426-0xB525` | Four sprites that may form a wave or bubble effect; not identified with certainty |
+| `0xB526-0xB565` | Zold defeated |
+
+The sequence occupies `0xB0E6-0xB565` inclusive (`0x480` bytes, or 18 sprite-equivalents). The next address is `0xB566` (CPU address `0x7566` with bank 2 selected).
+
 ### Main bank-2 tile-data batch
 
 A sequence of eight 8-byte records at `0x9024-0x9063` appears to contain a length, a bank-2 CPU source address, a VRAM destination (`0x8000` in each record), and two zero bytes. Interpreting those fields this way yields eight contiguous source ranges:
