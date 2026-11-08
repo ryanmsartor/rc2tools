@@ -25,6 +25,7 @@ class RenderGraphicsWrapperTests(unittest.TestCase):
         rom[0x147:0x149] = b"\x06\x02"
         rom[0x1000] = 0x80
         rom[0x1FFF0] = 0x80
+        rom[0x1FFFF] = 0x80
         (self.root / "input" / "Rolan's Curse II (USA).gb").write_bytes(rom)
 
     def run_wrapper(self, *args):
@@ -39,8 +40,8 @@ class RenderGraphicsWrapperTests(unittest.TestCase):
         result = self.run_wrapper("render-graphics")
         self.assertEqual(result.returncode, 0, result.stderr)
         with Image.open(self.root / "output" / "graphics.png") as image:
-            self.assertEqual(image.size, (1084, 8700))
-            self.assertEqual(image.getpixel((1052, 8668)), (85, 85, 85))
+            self.assertEqual(image.size, (1135, 8716))
+            self.assertEqual(image.getpixel((1103, 8684)), (85, 85, 85))
 
     def test_arguments_and_options_are_forwarded(self):
         output = self.root / "tiles with spaces.png"
@@ -51,13 +52,15 @@ class RenderGraphicsWrapperTests(unittest.TestCase):
         )
         self.assertEqual(result.returncode, 0, result.stderr)
         with Image.open(output) as image:
-            self.assertEqual(image.size, (16, 16))
-            self.assertEqual(image.getpixel((0, 0)), (85, 85, 85))
+            self.assertEqual(image.size, (59, 32))
+            self.assertEqual(image.getpixel((43, 16)), (85, 85, 85))
 
-    def test_incomplete_arguments_fail(self):
-        result = self.run_wrapper("render-graphics", "0x1000")
-        self.assertNotEqual(result.returncode, 0)
-        self.assertIn("required", result.stderr)
+    def test_start_only_renders_one_byte_range_through_end_of_rom(self):
+        result = self.run_wrapper("render-graphics", "0x1FFFF")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        with Image.open(self.root / "output" / "graphics.png") as image:
+            colors = image.getcolors(image.width * image.height)
+            self.assertIn((85, 85, 85), [color for _, color in colors])
 
 
 if __name__ == "__main__":

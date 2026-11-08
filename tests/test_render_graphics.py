@@ -22,11 +22,24 @@ class RenderGraphicsTests(unittest.TestCase):
         self.assertEqual(decoded[0][0], [1, 2, 0, 0, 0, 0, 0, 0])
         self.assertEqual(decoded[0][1], [0] * 8)
 
-    def test_rejects_empty_or_partial_tile_data(self):
-        for data in (b"", bytes(15), bytes(17)):
-            with self.subTest(length=len(data)):
-                with self.assertRaisesRegex(ValueError, "multiple of 16"):
-                    render_graphics.decode_tiles(data)
+    def test_rejects_empty_data(self):
+        with self.assertRaisesRegex(ValueError, "at least one byte"):
+            render_graphics.decode_tiles(b"")
+
+    def test_decodes_partial_tiles_at_byte_granularity(self):
+        for length in range(1, render_graphics.TILE_BYTES):
+            with self.subTest(length=length):
+                tile = render_graphics.decode_tiles(bytes(length))[0]
+                self.assertEqual(tile, [[0] * 8 for _ in range(8)])
+
+        one_byte_tile = render_graphics.decode_tiles(b"\x80")[0]
+        self.assertEqual(one_byte_tile[0], [1, 0, 0, 0, 0, 0, 0, 0])
+        self.assertEqual(one_byte_tile[1:], [[0] * 8 for _ in range(7)])
+
+        decoded = render_graphics.decode_tiles(bytes([0x80, 0, 0x40, 0]))
+        self.assertEqual(decoded[0][0], [1, 0, 0, 0, 0, 0, 0, 0])
+        self.assertEqual(decoded[0][1], [0, 1, 0, 0, 0, 0, 0, 0])
+        self.assertEqual(decoded[0][2:], [[0] * 8 for _ in range(6)])
 
     def test_assembles_four_tiles_in_column_first_sprite_order(self):
         tile_1 = bytes([0xFF, 0]) * 8
@@ -54,6 +67,19 @@ class RenderGraphicsTests(unittest.TestCase):
         self.assertEqual(image.getpixel((8, 0)), (0, 0, 0))
         self.assertEqual(image.getpixel((16 - 1, 0)), (0, 0, 0))
 
+    def test_address_axes_label_cel_starts(self):
+        with patch.object(render_graphics.ImageDraw.ImageDraw, "text", autospec=True) as draw_text:
+            render_graphics.render_sprites(
+                bytes(3 * 4 * render_graphics.TILE_BYTES),
+                columns=2,
+                scale=1,
+                start_address=0x1000,
+            )
+        self.assertEqual(
+            [call.args[2] for call in draw_text.call_args_list],
+            ["0x1000", "0x1040", "0x1000", "0x1080"],
+        )
+
     def test_cli_writes_png_for_a_rom_range(self):
         rom = bytearray(0x20000)
         rom[0x134:0x143] = b"ROLAN'S CURSE 2"
@@ -72,8 +98,12 @@ class RenderGraphicsTests(unittest.TestCase):
             with patch.object(sys, "argv", arguments):
                 self.assertEqual(render_graphics.main(), 0)
             with Image.open(output_path) as image:
-                self.assertEqual(image.size, (16, 16))
-                self.assertEqual(image.getpixel((0, 0)), (85, 85, 85))
+                self.assertGreater(image.width, 16)
+                self.assertGreater(image.height, 16)
+                colors = image.getcolors(image.width * image.height)
+                self.assertIn((85, 85, 85), [color for _, color in colors])
+                top_axis = image.crop((0, 0, image.width, 16))
+                self.assertTrue(any(pixel != (255, 255, 255) for pixel in top_axis.getdata()))
 
     def test_cli_writes_jpeg(self):
         rom = bytearray(0x20000)

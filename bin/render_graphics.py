@@ -6,7 +6,7 @@ import math
 import sys
 from pathlib import Path
 
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFont
 
 from extract_json import read_rom
 
@@ -34,15 +34,16 @@ def parse_offset(value: str) -> int:
 
 
 def decode_tiles(data: bytes) -> list[list[int]]:
-    """Decode consecutive 16-byte Game Boy 2bpp tiles into color indices."""
-    if not data or len(data) % TILE_BYTES:
-        raise ValueError("range must contain a nonzero multiple of 16 bytes")
+    """Decode Game Boy 2bpp tiles, allowing a final tile to end at any byte."""
+    if not data:
+        raise ValueError("range must contain at least one byte")
 
     pixels = []
     for tile_start in range(0, len(data), TILE_BYTES):
+        tile_data = data[tile_start:tile_start + TILE_BYTES].ljust(TILE_BYTES, b"\x00")
         tile = []
         for row in range(TILE_WIDTH):
-            low, high = data[tile_start + row * 2:tile_start + row * 2 + 2]
+            low, high = tile_data[row * 2:row * 2 + 2]
             tile.append([
                 ((low >> bit) & 1) | (((high >> bit) & 1) << 1)
                 for bit in range(7, -1, -1)
@@ -51,11 +52,87 @@ def decode_tiles(data: bytes) -> list[list[int]]:
     return pixels
 
 
+def add_address_axes(
+    image: Image.Image,
+    sprite_count: int,
+    columns: int,
+    start_address: int,
+    scale: int,
+) -> Image.Image:
+    """Add ROM address labels for the first cel in each column and row."""
+    rows = math.ceil(sprite_count / columns)
+    column_addresses = [
+        f"0x{start_address + column * 4 * TILE_BYTES:04X}"
+        for column in range(min(columns, sprite_count))
+    ]
+    row_addresses = [
+        f"0x{start_address + row * columns * 4 * TILE_BYTES:04X}"
+        for row in range(rows)
+    ]
+    font = ImageFont.load_default()
+    column_bounds = [font.getbbox(address) for address in column_addresses]
+    row_bounds = [font.getbbox(address) for address in row_addresses]
+    column_label_width = max(right - left for left, _, right, _ in column_bounds)
+    row_label_width = max(right - left for left, _, right, _ in row_bounds)
+    label_height = max(bottom - top for _, top, _, bottom in column_bounds + row_bounds)
+
+    cell_size = SPRITE_WIDTH * scale
+    source_pitch = (SPRITE_WIDTH + SPRITE_GUTTER) * scale
+    column_pitch = max(source_pitch, column_label_width + 8)
+    row_pitch = max(source_pitch, label_height + 8)
+    top_margin = label_height + 8
+    left_margin = row_label_width + 8
+    graphic_width = columns * cell_size + (columns - 1) * (column_pitch - cell_size)
+    graphic_height = rows * cell_size + (rows - 1) * (row_pitch - cell_size)
+    output = Image.new(
+        "RGB",
+        (left_margin + graphic_width, top_margin + graphic_height),
+        (255, 255, 255),
+    )
+
+    for sprite_index in range(sprite_count):
+        source_x = sprite_index % columns * source_pitch
+        source_y = sprite_index // columns * source_pitch
+        sprite = image.crop((source_x, source_y, source_x + cell_size, source_y + cell_size))
+        target_x = left_margin + sprite_index % columns * column_pitch
+        target_y = top_margin + sprite_index // columns * row_pitch
+        output.paste(sprite, (target_x, target_y))
+
+    draw = ImageDraw.Draw(output)
+    for column, address in enumerate(column_addresses):
+        left, top, right, bottom = font.getbbox(address)
+        center_x = left_margin + column * column_pitch + cell_size / 2
+        draw.text(
+            (center_x - (right - left) / 2 - left, (top_margin - (bottom - top)) / 2 - top),
+            address,
+            fill=(0, 0, 0),
+            font=font,
+        )
+    for row, address in enumerate(row_addresses):
+        left, top, right, bottom = font.getbbox(address)
+        center_y = top_margin + row * row_pitch + cell_size / 2
+        draw.text(
+            ((left_margin - (right - left)) / 2 - left, center_y - (bottom - top) / 2 - top),
+            address,
+            fill=(0, 0, 0),
+            font=font,
+        )
+
+    for column in range(1, columns):
+        x = left_margin + column * column_pitch - SPRITE_GUTTER * scale
+        draw.line((x, top_margin, x, top_margin + graphic_height - 1), fill=GUTTER_COLOR)
+    for row in range(1, rows):
+        y = top_margin + row * row_pitch - SPRITE_GUTTER * scale
+        draw.line((left_margin, y, left_margin + graphic_width - 1, y), fill=GUTTER_COLOR)
+    return output
+
+
 def render_sprites(
     data: bytes,
     columns: int = 16,
     scale: int = 4,
     palette: tuple[tuple[int, int, int], ...] = DEFAULT_PALETTE,
+    start_address: int | None = None,
 ) -> Image.Image:
     """Render groups of four column-first tiles as 16x16 sprites."""
     if columns < 1:
@@ -91,6 +168,8 @@ def render_sprites(
 
     if scale > 1:
         image = image.resize((image.width * scale, image.height * scale), Image.Resampling.NEAREST)
+    if start_address is not None:
+        image = add_address_axes(image, sprite_count, columns, start_address, scale)
     return image
 
 
@@ -119,7 +198,7 @@ def main() -> int:
         if args.end > len(rom):
             raise ValueError(f"range end 0x{args.end:X} exceeds ROM size 0x{len(rom):X}")
         data = rom[args.start:args.end]
-        image = render_sprites(data, args.columns, args.scale)
+        image = render_sprites(data, args.columns, args.scale, start_address=args.start)
         args.output.parent.mkdir(parents=True, exist_ok=True)
         image.save(args.output)
     except (OSError, UnicodeError, ValueError) as error:

@@ -72,6 +72,55 @@ The following identification is based on decoding bytes as Game Boy 2bpp tiles a
 
 All source ranges below are physical ROM offsets in **bank 2**. For a CPU source pointer in the banked window, add `0x4000` to obtain the physical offset; conversely, subtract `0x4000` from the physical offset to obtain the CPU address with bank 2 selected. Each uncompressed 2bpp tile is 16 bytes (8×8 pixels).
 
+### In-UI character weapon and ability icons
+
+A sequence of 23 consecutive 16×16 sprites beginning at physical ROM offset `0x804E` contains the in-UI icons below, in order. Each sprite occupies 64 bytes (`0x40`), or four consecutive tiles.
+
+| # | Character | Icon | Physical ROM start |
+|---:|---|---|---:|
+| 1 | Hero | Sword | `0x804E` |
+| 2 | Hero | Magic ball | `0x808E` |
+| 3 | Pit | Dagger | `0x80CE` |
+| 4 | Pit | Boomerang | `0x810E` |
+| 5 | Pit | Bomb | `0x814E` |
+| 6 | Lane | Rod | `0x818E` |
+| 7 | Lane | Shield | `0x81CE` |
+| 8 | Lane | Heal | `0x820E` |
+| 9 | Kyle | Bone | `0x824E` |
+| 10 | Kyle | Play dead | `0x828E` |
+| 11 | Kyle | Lightning rod | `0x82CE` |
+| 12 | Jude | Fireball | `0x830E` |
+| 13 | Jude | Smash ball | `0x834E` |
+| 14 | Jude | Earthquake spell | `0x838E` |
+| 15 | Lee | Sai | `0x83CE` |
+| 16 | Lee | Fist | `0x840E` |
+| 17 | Lee | Firecracker | `0x844E` |
+| 18 | Lora | Bow | `0x848E` |
+| 19 | Lora | Heal | `0x84CE` |
+| 20 | Lora | Wings | `0x850E` |
+| 21 | Zold | Sword | `0x854E` |
+| 22 | Zold | Wave | `0x858E` |
+| 23 | Zold | Magic | `0x85CE` |
+
+The block occupies `0x804E-0x860D` inclusive; the next address after the final icon is `0x860E`. With bank 2 selected, the corresponding CPU address range is `0x404E-0x460D`.
+
+### Character level-up faces
+
+The next eight 16×16 sprites are the character faces used for level-up pickups, in character order. Each occupies 64 bytes (`0x40`).
+
+| # | Character | Physical ROM start |
+|---:|---|---:|
+| 1 | Hero | `0x860E` |
+| 2 | Pit | `0x864E` |
+| 3 | Lane | `0x868E` |
+| 4 | Kyle | `0x86CE` |
+| 5 | Jude | `0x870E` |
+| 6 | Lee | `0x874E` |
+| 7 | Lora | `0x878E` |
+| 8 | Zold | `0x87CE` |
+
+These faces occupy `0x860E-0x880D` inclusive. The next address is `0x880E`; with bank 2 selected, the CPU range is `0x460E-0x480D`.
+
 ### Hero sprite tiles
 
 The four tiles matching the screenshot are consecutive 16-byte tiles at `0x9106-0x9145` (inclusive). Their file order is column-first, not row-first:
@@ -91,6 +140,120 @@ Thus the on-screen arrangement is:
 | Bottom | `0x9116` | `0x9136` |
 
 The top-right tile at `0x9126` was an exact 2bpp match; the other three tiles also match the screenshot's opaque pixels when transparent tile color 0 is allowed to show the background through. The top-left tile bytes also recur at `0x9146`; the four addresses above are supported as one sprite by the consecutive tile layout and the matches of all four quadrants.
+
+### Hero animation, weapon, and spell sprites
+
+After the level-up faces, the intervening graphics are only partly intelligible in the current rendering. Recognizable Hero art resumes at `0x9106` and continues through `0x9605`, matching the first `0x500`-byte tile-data batch below. The sequence contains 19 complete 16×16 sprites and two 8×16 left halves, totaling 20 sprite-equivalents:
+
+| Physical ROM range | Contents |
+|---|---|
+| `0x9106-0x9185` | Hero idling down (2 sprites) |
+| `0x9186-0x9205` | Hero idling up (2 sprites) |
+| `0x9206-0x9285` | Hero idling left (2 sprites) |
+| `0x9286-0x92C5` | Hero attacking down |
+| `0x92C6-0x9305` | Hero attacking up |
+| `0x9306-0x9345` | Hero attacking left |
+| `0x9346-0x9385` | Hero sword, downward |
+| `0x9386-0x93C5` | Hero sword, upward |
+| `0x93C6-0x9405` | Hero sword, left |
+| `0x9406-0x9585` | Six sprite-equivalents of sword arcs; difficult to interpret in the current rendering |
+| `0x9586-0x95A5` | Left half of Hero's low-level electric ball |
+| `0x95A6-0x95C5` | Left half of Hero's high-level electric ball |
+| `0x95C6-0x9605` | Hero defeated |
+
+The sequence ends at `0x9605` inclusive; the next address is `0x9606` (CPU address `0x5606` with bank 2 selected).
+
+### Pit animation and weapon sprites
+
+The sequence beginning at `0x9606` starts with Pit's nine movement and attack sprites in the same pose order as Hero's: two each idling down, up, and left, followed by one attack sprite facing down, up, and left. They are followed by two full-size boomerangs, two 32-byte dagger halves, a bomb, three full-size light balls, and Pit's defeated sprite.
+
+| Physical ROM range | Contents |
+|---|---|
+| `0x9606-0x9685` | Pit idling down (2 sprites) |
+| `0x9686-0x9705` | Pit idling up (2 sprites) |
+| `0x9706-0x9785` | Pit idling left (2 sprites) |
+| `0x9786-0x97C5` | Pit attacking down |
+| `0x97C6-0x9805` | Pit attacking up |
+| `0x9806-0x9845` | Pit attacking left |
+| `0x9846-0x9885` | Pit's boomerang facing left |
+| `0x9886-0x98C5` | Pit's boomerang facing right |
+| `0x98C6-0x98E5` | Pit's downward-facing dagger half |
+| `0x98E6-0x9905` | Pit's left-facing dagger half |
+| `0x9906-0x9945` | Pit's bomb |
+| `0x9946-0x9A05` | Three full-size light balls |
+| `0x9A06-0x9A45` | Pit defeated |
+
+In the current visualization, each dagger half appears split and stacked vertically. The sequence ends at `0x9A45` inclusive; the next address is `0x9A46` (CPU address `0x5A46` with bank 2 selected).
+
+### Lane animation, rod, and particle sprites
+
+The sequence beginning at `0x9A46` starts with Lane's nine movement and attack sprites in the same pose order as Hero's and Pit's: two each idling down, up, and left, followed by one attack sprite facing down, up, and left. These are followed by Lane's rod facing down, up, and left; one composite sprite containing three particle effects and a fully transparent tile; and Lane's defeated sprite.
+
+| Physical ROM range | Contents |
+|---|---|
+| `0x9A46-0x9AC5` | Lane idling down (2 sprites) |
+| `0x9AC6-0x9B45` | Lane idling up (2 sprites) |
+| `0x9B46-0x9BC5` | Lane idling left (2 sprites) |
+| `0x9BC6-0x9C05` | Lane attacking down |
+| `0x9C06-0x9C45` | Lane attacking up |
+| `0x9C46-0x9C85` | Lane attacking left |
+| `0x9C86-0x9CC5` | Lane's rod facing down |
+| `0x9CC6-0x9D05` | Lane's rod facing up |
+| `0x9D06-0x9D45` | Lane's rod facing left |
+| `0x9D46-0x9D85` | Three particle effects and one fully transparent tile |
+| `0x9D86-0x9DC5` | Lane defeated |
+
+The sequence ends at `0x9DC5` inclusive; the next address is `0x9DC6` (CPU address `0x5DC6` with bank 2 selected).
+
+### Kyle animation, weapons, and effects
+
+The sequence beginning at `0x9DC6` starts with nine standard movement and attack sprites in the same pose order as the other characters: two each idling down, up, and left, followed by one attack sprite facing down, up, and left. These are followed by Kyle's bone, two Play Dead frames, lightning, bomb/lightning-rod effect graphics, defeated sprite, and three light orbs.
+
+| Physical ROM range | Contents |
+|---|---|
+| `0x9DC6-0x9E45` | Kyle idling down (2 sprites) |
+| `0x9E46-0x9EC5` | Kyle idling up (2 sprites) |
+| `0x9EC6-0x9F45` | Kyle idling left (2 sprites) |
+| `0x9F46-0x9F85` | Kyle attacking down |
+| `0x9F86-0x9FC5` | Kyle attacking up |
+| `0x9FC6-0xA005` | Kyle attacking left |
+| `0xA006-0xA045` | Kyle's bone facing down |
+| `0xA046-0xA085` | Kyle's bone facing up |
+| `0xA086-0xA0C5` | Kyle's bone facing left |
+| `0xA0C6-0xA105` | First frame of Kyle's Play Dead animation |
+| `0xA106-0xA145` | Second frame of Kyle's Play Dead animation |
+| `0xA146-0xA185` | Kyle lightning sprite 1 |
+| `0xA186-0xA1C5` | Kyle lightning sprite 2 |
+| `0xA1C6-0xA205` | Bomb/lightning-rod effect area: two quarter-sprites stacked vertically and two fully transparent quarter-sprites |
+| `0xA206-0xA245` | Kyle defeated |
+| `0xA246-0xA305` | Three light orbs, matching the ones after Pit's bomb |
+
+The sequence ends at `0xA305` inclusive; the next address is `0xA306` (CPU address `0x6306` with bank 2 selected).
+
+### Jude animation, rod, and fireball sprites
+
+The sequence beginning at `0xA306` starts with nine standard movement and attack sprites in the same pose order as the other characters: two each idling down, up, and left, followed by one attack sprite facing down, up, and left. These are followed by Jude's rod, weak and higher-level fireballs, the rod-overhead pose, and his defeated sprite.
+
+| Physical ROM range | Contents |
+|---|---|
+| `0xA306-0xA385` | Jude idling down (2 sprites) |
+| `0xA386-0xA405` | Jude idling up (2 sprites) |
+| `0xA406-0xA485` | Jude idling left (2 sprites) |
+| `0xA486-0xA4C5` | Jude attacking down |
+| `0xA4C6-0xA505` | Jude attacking up |
+| `0xA506-0xA545` | Jude attacking left |
+| `0xA546-0xA585` | Jude's rod facing down |
+| `0xA586-0xA5C5` | Jude's rod facing up |
+| `0xA5C6-0xA605` | Jude's rod facing left |
+| `0xA606-0xA625` | Half-sprite of Jude's weak fireball facing down |
+| `0xA626-0xA645` | Half-sprite of Jude's weak fireball facing left; it appears split in two in the current visualization, like Pit's dagger |
+| `0xA646-0xA6C5` | Two higher-level fireball sprites; direction/order is unclear |
+| `0xA6C6-0xA705` | Third higher-level fireball sprite; direction/order is unclear |
+| `0xA706-0xA745` | Top half of Jude holding the rod above his head |
+| `0xA746-0xA785` | Lower half of that pose, containing his body and all but the tip of his hat |
+| `0xA786-0xA7C5` | Jude defeated |
+
+The sequence ends at `0xA7C5` inclusive; the next address is `0xA7C6` (CPU address `0x67C6` with bank 2 selected).
 
 ### Main bank-2 tile-data batch
 
