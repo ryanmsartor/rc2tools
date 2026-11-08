@@ -11,7 +11,7 @@ rc2t_print_help_message() {
     echo "  dump-hex        Dump the contents in hexadecimal"
     echo "  check-hash      Check the hash"
     echo "  extract-json    [rom-or-hex]  Extract character stats into output/<rom-sha256>.json"
-    echo "  render-graphics [start [end output]] [options]  Render ROM tiles (default: entire ROM)"
+    echo "  render-graphics [start [end [WxH|output]]] [options]  Render ROM tiles (default: entire ROM)"
     echo "  swap-character-sprite <character1> <character2>  Write an IPS sprite-swap patch"
 }
 
@@ -59,8 +59,12 @@ case "$1" in
             python3 bin/render_graphics.py 0 0x20000 output/graphics.png
         elif [ "$#" -eq 2 ]; then
             python3 bin/render_graphics.py "$2" 0x20000 output/graphics.png
+        elif [ "$#" -ge 3 ] && [[ "$3" =~ ^0*[1-9][0-9]*[xX][0-9]+$ ]]; then
+            python3 bin/render_graphics.py "$2" 0x20000 output/graphics.png --tile-grid "$3" "${@:4}"
         elif [[ "$3" == --* ]]; then
             python3 bin/render_graphics.py "$2" 0x20000 output/graphics.png "${@:3}"
+        elif [ "$#" -ge 4 ] && [[ "$4" =~ ^0*[1-9][0-9]*[xX][0-9]+$ ]]; then
+            python3 bin/render_graphics.py "$2" "$3" output/graphics.png --tile-grid "$4" "${@:5}"
         else
             python3 bin/render_graphics.py "${@:2}"
         fi

@@ -51,7 +51,7 @@ These are landmarks, not a complete disassembly. In particular, routine names an
 
 ## Bank inventory
 
-The ROM has eight physical banks. The character tables described below are in bank 5. A graphics/tile-data region and related descriptors have been tentatively identified in bank 2; details and confidence are documented below. Other banks are not yet reliably classified by subsystem.
+The ROM has eight physical banks. The character tables described below are in bank 5. Graphics/tile-data regions and related descriptors have been identified in banks 2 and 6; details and confidence are documented below. Other banks are not yet reliably classified by subsystem.
 
 | Physical bank | ROM file offsets |
 |---:|---|
@@ -68,9 +68,22 @@ The title is the only clear long ASCII string found in the initial string scan. 
 
 ## Graphics and tile data (preliminary)
 
-The following identification is based on decoding bytes as Game Boy 2bpp tiles and matching a Hero sprite in `docs/screenshot_1.png`. The tile match confirms the format and the listed sprite tiles; the surrounding descriptor tables look like graphics transfer lists, but their consuming code has not been traced. Treat their field meanings as tentative.
+The following identification is based on decoding bytes as Game Boy 2bpp tiles and matching them to screenshots. The tile matches confirm the format and the listed sprite tiles; descriptor fields are interpreted from their layout, but their consuming code has not been traced.
 
-All source ranges below are physical ROM offsets in **bank 2**. For a CPU source pointer in the banked window, add `0x4000` to obtain the physical offset; conversely, subtract `0x4000` from the physical offset to obtain the CPU address with bank 2 selected. Each uncompressed 2bpp tile is 16 bytes (8×8 pixels).
+Unless noted otherwise, source ranges below are physical ROM offsets in **bank 2**. For a CPU source pointer in the banked window, add `0x4000` to obtain the physical offset; conversely, subtract `0x4000` from the physical offset to obtain the CPU address with bank 2 selected. Each uncompressed 2bpp tile is 16 bytes (8×8 pixels).
+
+### Title-screen graphics
+
+Matching tiles against [screenshot 3](./screenshot_3.png) identifies a contiguous `0xA50`-byte title-screen graphics block in physical bank 6, from `0x1A6AE` through `0x1B0FD` inclusive. The bytes decode as raw, uncompressed Game Boy 2bpp tiles (165 tiles at 16 bytes each).
+
+A descriptor table at physical offset `0x18110` (CPU address `0x4110` with bank 6 selected) contains two adjacent six-byte entries. Interpreting each entry as little-endian byte length, source CPU address, and VRAM destination gives:
+
+| Length | Source CPU address (bank 6 selected) | Physical ROM range | VRAM destination |
+|---:|---:|---:|---:|
+| `0x0550` | `0x66AE` | `0x1A6AE-0x1ABFD` | `0x8800` |
+| `0x0500` | `0x6BFE` | `0x1ABFE-0x1B0FD` | `0x9300` |
+
+The physical source ranges are contiguous and their 85- and 80-tile blocks together account for all `0xA50` bytes. Tiles from both blocks match the title artwork in the screenshot. The six-byte field interpretation is based on the entries' structure, transfer-sized lengths, bank-6 source pointers, and VRAM destination addresses; the consuming routine has not been traced. The screen tilemap and palette are also not identified, so this maps the graphics data rather than the complete screen composition.
 
 ### In-UI character weapon and ability icons
 
@@ -121,6 +134,31 @@ The next eight 16×16 sprites are the character faces used for level-up pickups,
 
 These faces occupy `0x860E-0x880D` inclusive. The next address is `0x880E`; with bank 2 selected, the CPU range is `0x460E-0x480D`.
 
+### POW-screen character portraits
+
+The POW screen's larger portraits are eight contiguous 32×32 images beginning
+at physical offset `0x880E`. Each image contains sixteen consecutive 8×8 tiles
+in row-major order (four tiles across by four down), occupying `0x100` bytes.
+Rendering `0x880E-0x900D` in portrait mode produces eight recognizable faces.
+The first three match Hero (shown as COOL), Pit, and Lane in the POW screenshot.
+The following five are Kyle, Jude, Lee, Lora, and Zold, in that order.
+
+| # | Character | Physical ROM range | CPU range (bank 2 selected) | Evidence |
+|---:|---|---|---|---|
+| 1 | Hero | `0x880E-0x890D` | `0x480E-0x490D` | POW screenshot match |
+| 2 | Pit | `0x890E-0x8A0D` | `0x490E-0x4A0D` | POW screenshot match |
+| 3 | Lane | `0x8A0E-0x8B0D` | `0x4A0E-0x4B0D` | POW screenshot match |
+| 4 | Kyle | `0x8B0E-0x8C0D` | `0x4B0E-0x4C0D` | Portrait sequence confirmed |
+| 5 | Jude | `0x8C0E-0x8D0D` | `0x4C0E-0x4D0D` | Portrait sequence confirmed |
+| 6 | Lee | `0x8D0E-0x8E0D` | `0x4D0E-0x4E0D` | Portrait sequence confirmed |
+| 7 | Lora | `0x8E0E-0x8F0D` | `0x4E0E-0x4F0D` | Portrait sequence confirmed |
+| 8 | Zold | `0x8F0E-0x900D` | `0x4F0E-0x500D` | Portrait sequence confirmed |
+
+These are separate from the 16×16 level-up faces above. The existing
+`render-graphics` sprite layout groups four tiles into a 16×16 image and does
+not preserve this row-major 4×4 arrangement; use `--mode portraits` to render
+the larger faces.
+
 ### Hero sprite tiles
 
 The four tiles matching the screenshot are consecutive 16-byte tiles at `0x9106-0x9145` (inclusive). Their file order is column-first, not row-first:
@@ -143,7 +181,7 @@ The top-right tile at `0x9126` was an exact 2bpp match; the other three tiles al
 
 ### Hero animation, weapon, and spell sprites
 
-After the level-up faces, the intervening graphics are only partly intelligible in the current rendering. Recognizable Hero art resumes at `0x9106` and continues through `0x9605`, matching the first `0x500`-byte tile-data batch below. The sequence contains 19 complete 16×16 sprites and two 8×16 left halves, totaling 20 sprite-equivalents:
+After the level-up faces and POW portraits, the intervening graphics are only partly intelligible in the current rendering. Recognizable Hero art resumes at `0x9106` and continues through `0x9605`, matching the first `0x500`-byte tile-data batch below. The sequence contains 19 complete 16×16 sprites and two 8×16 left halves, totaling 20 sprite-equivalents:
 
 | Physical ROM range | Contents |
 |---|---|
@@ -451,7 +489,7 @@ Fixed-bank code at `0x009DE-0x009EB` loads one of these table bases (`0x7165` or
 | Runtime variables / character state | CPU addresses and the code that updates them are not yet established. See the separate save analysis for observed saved fields. |
 | Character templates / stats | HP, MP, attack, and ability tables are identified from the annotated dump in bank 5 above; consumers and some field meanings/boundaries remain to be verified. Other character data is not yet located. |
 | Maps / collision / encounters | No ROM file offsets or table format confirmed. |
-| Text / character graphics | The title is at `0x0134-0x0143`; a preliminary bank-2 tile-data batch and matching four-tile Hero sprite are documented above. Dialogue/text tables, font data, tile maps, palettes, and the loader that consumes the graphics descriptors remain unidentified. |
+| Text / character graphics | The cartridge title is at `0x0134-0x0143`; title-screen graphics in bank 6 and character graphics in bank 2 are documented above. The title screen's tilemap and palette, dialogue/text tables, and the routines that consume graphics descriptors remain unidentified. |
 | Audio / music / sound effects | No code or data ranges identified yet. Game Boy sound registers are in `0xFF10-0xFF3F`, but that hardware fact does not identify the ROM routines or music data. |
 
 ## Next steps to turn this into a byte-level map

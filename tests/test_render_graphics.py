@@ -1,3 +1,4 @@
+import argparse
 import importlib.util
 import sys
 import tempfile
@@ -16,6 +17,13 @@ SPEC.loader.exec_module(render_graphics)
 
 
 class RenderGraphicsTests(unittest.TestCase):
+    def test_parses_tile_grid_dimensions(self):
+        self.assertEqual(render_graphics.parse_tile_grid("2x3"), (2, 3))
+        self.assertEqual(render_graphics.parse_tile_grid("1X2"), (1, 2))
+        for value in ("0x2", "2x0", "2by2", "2x2x2"):
+            with self.subTest(value=value), self.assertRaises(argparse.ArgumentTypeError):
+                render_graphics.parse_tile_grid(value)
+
     def test_decodes_two_bitplanes_left_to_right(self):
         tile = bytes([0x80, 0x40]) + bytes(14)
         decoded = render_graphics.decode_tiles(tile)
@@ -57,6 +65,18 @@ class RenderGraphicsTests(unittest.TestCase):
         self.assertEqual(image.getpixel((16, 0)), (255, 255, 255))
         self.assertEqual(image.getpixel((16, 16)), (0, 0, 0))
 
+    def test_assembles_arbitrary_tile_grid_in_row_major_order(self):
+        def tile_data(color):
+            low = 0xFF if color & 1 else 0
+            high = 0xFF if color & 2 else 0
+            return bytes((low, high)) * 8
+
+        data = b"".join(tile_data(index % 4) for index in range(6))
+        image = render_graphics.render_tile_grid(data, 2, 3, columns=1, scale=1)
+        self.assertEqual(image.size, (16, 24))
+        self.assertEqual(image.getpixel((8, 0)), render_graphics.DEFAULT_PALETTE[1])
+        self.assertEqual(image.getpixel((0, 8)), render_graphics.DEFAULT_PALETTE[2])
+
     def test_incomplete_sprite_keeps_tiles_and_leaves_missing_quadrants_blank(self):
         tile_1 = bytes([0xFF, 0]) * 8
         tile_2 = bytes([0, 0xFF]) * 8
@@ -66,6 +86,22 @@ class RenderGraphicsTests(unittest.TestCase):
         self.assertEqual(image.getpixel((0, 8)), (170, 170, 170))
         self.assertEqual(image.getpixel((8, 0)), (0, 0, 0))
         self.assertEqual(image.getpixel((16 - 1, 0)), (0, 0, 0))
+
+    def test_assembles_portrait_tiles_in_row_major_order(self):
+        def tile_data(color):
+            low = 0xFF if color & 1 else 0
+            high = 0xFF if color & 2 else 0
+            return bytes((low, high)) * 8
+
+        data = b"".join(tile_data(index % 4) for index in range(16))
+        image = render_graphics.render_portraits(data, columns=1, scale=1)
+        self.assertEqual(image.size, (32, 32))
+        self.assertEqual(image.getpixel((8, 0)), render_graphics.PORTRAIT_PALETTE[1])
+        self.assertEqual(image.getpixel((0, 8)), render_graphics.PORTRAIT_PALETTE[0])
+
+    def test_portrait_renderer_requires_complete_portraits(self):
+        with self.assertRaisesRegex(ValueError, "multiple of 0x100 bytes"):
+            render_graphics.render_portraits(bytes(0xFF))
 
     def test_address_axes_label_cel_starts(self):
         with patch.object(render_graphics.ImageDraw.ImageDraw, "text", autospec=True) as draw_text:
@@ -79,6 +115,77 @@ class RenderGraphicsTests(unittest.TestCase):
             [call.args[2] for call in draw_text.call_args_list],
             ["0x1000", "0x1040", "0x1000", "0x1080"],
         )
+
+    def test_tile_grid_address_axes_use_grid_byte_size(self):
+        tile_count = 3 * 2 * 3
+        with patch.object(render_graphics.ImageDraw.ImageDraw, "text", autospec=True) as draw_text:
+            render_graphics.render_tile_grid(
+                bytes(tile_count * render_graphics.TILE_BYTES),
+                2,
+                3,
+                columns=2,
+                scale=1,
+                start_address=0x1000,
+            )
+        self.assertEqual(
+            [call.args[2] for call in draw_text.call_args_list],
+            ["0x1000", "0x1060", "0x1000", "0x10C0"],
+        )
+
+    def test_portrait_address_axes_label_each_256_byte_block(self):
+        with patch.object(render_graphics.ImageDraw.ImageDraw, "text", autospec=True) as draw_text:
+            render_graphics.render_portraits(
+                bytes(2 * render_graphics.PORTRAIT_BYTES),
+                columns=2,
+                scale=1,
+                start_address=0x880E,
+            )
+        self.assertEqual(
+            [call.args[2] for call in draw_text.call_args_list],
+            ["0x880E", "0x890E", "0x880E"],
+        )
+
+    def test_cli_renders_portrait_mode(self):
+        rom = bytearray(0x20000)
+        rom[0x134:0x143] = b"ROLAN'S CURSE 2"
+        rom[0x147:0x149] = b"\x06\x02"
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            input_path = root / "game.gb"
+            output_path = root / "portraits.png"
+            input_path.write_bytes(rom)
+            arguments = [
+                "render_graphics.py", "0x1000", "0x1100", str(output_path),
+                "--input", str(input_path), "--mode", "portraits", "--scale", "1",
+            ]
+            with patch.object(sys, "argv", arguments):
+                self.assertEqual(render_graphics.main(), 0)
+            with Image.open(output_path) as image:
+                colors = [color for _, color in image.getcolors(image.width * image.height)]
+                self.assertIn(render_graphics.PORTRAIT_PALETTE[0], colors)
+
+    def test_cli_renders_custom_tile_grid(self):
+        rom = bytearray(0x20000)
+        rom[0x134:0x143] = b"ROLAN'S CURSE 2"
+        rom[0x147:0x149] = b"\x06\x02"
+        rom[0x1000] = 0x80
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            input_path = root / "game.gb"
+            output_path = root / "grid.png"
+            input_path.write_bytes(rom)
+            arguments = [
+                "render_graphics.py", "0x1000", "0x1060", str(output_path),
+                "--input", str(input_path), "--tile-grid", "2x3",
+                "--columns", "1", "--scale", "1",
+            ]
+            with patch.object(sys, "argv", arguments):
+                self.assertEqual(render_graphics.main(), 0)
+            with Image.open(output_path) as image:
+                colors = [color for _, color in image.getcolors(image.width * image.height)]
+                self.assertIn(render_graphics.DEFAULT_PALETTE[1], colors)
 
     def test_cli_writes_png_for_a_rom_range(self):
         rom = bytearray(0x20000)

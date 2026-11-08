@@ -55,6 +55,17 @@ class RenderGraphicsWrapperTests(unittest.TestCase):
             self.assertEqual(image.size, (59, 32))
             self.assertEqual(image.getpixel((43, 16)), (85, 85, 85))
 
+    def test_positional_tile_grid_renders_to_default_output(self):
+        result = self.run_wrapper(
+            "render-graphics", "0x1000", "0x1060", "2x3", "--scale", "1",
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        with Image.open(self.root / "output" / "graphics.png") as image:
+            self.assertGreater(image.width, 16)
+            self.assertGreater(image.height, 24)
+            colors = [color for _, color in image.getcolors(image.width * image.height)]
+            self.assertIn((85, 85, 85), colors)
+
     def test_start_only_renders_one_byte_range_through_end_of_rom(self):
         result = self.run_wrapper("render-graphics", "0x1FFFF")
         self.assertEqual(result.returncode, 0, result.stderr)

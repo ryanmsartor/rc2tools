@@ -27,7 +27,7 @@ levels 1 through 16; the mappings and their unresolved interpretations are
 documented in [the ROM map](docs/rom-map.md). The output file is overwritten
 if a file with that ROM hash already exists.
 
-## Render graphics as assembled sprites
+## Render graphics as tile grids, sprites, and portraits
 
 Rendering requires Pillow 10.0 or later. Install it with:
 
@@ -50,6 +50,20 @@ To render from a start offset through the end of the ROM, run:
 
 This also writes to `output/graphics.png`.
 
+To combine a different number of tiles into each rendered image, pass the
+tile grid as `WIDTHxHEIGHT` after the start and end offsets:
+
+```sh
+./rc2t render-graphics 0x880E 0x900E 4x4
+./rc2t render-graphics 0x9106 0xB566 1x2
+```
+
+The dimensions mean tiles across by tiles down. Explicit grids are assembled
+row-major, use four images per row by default, and can be any positive size.
+Without an explicit grid, the existing 2×2 column-first sprite layout remains
+the default. You can also pass the grid as `--tile-grid WIDTHxHEIGHT` when
+providing an output path or invoking the Python script directly.
+
 To render an inclusive-start, exclusive-end ROM byte range as a sheet of
 assembled sprites, pass the range and output path:
 
@@ -71,16 +85,30 @@ first cel begins, and each row along the left with the address where its first
 cel begins. Each cel uses 64 bytes; each row's left-axis address advances by
 one full row (`columns * 64` bytes).
 
-The default sheet uses 16 sprites per row. Its grayscale palette displays
-transparent color index 0 as black, while the inverted non-transparent
-palette displays index 3 as white.
+Use `--mode portraits` to render complete 32×32 portrait blocks with the
+POW-screen palette. Each block is `0x100` bytes containing a row-major 4×4
+grid of 8×8 tiles. For example, to render the eight portraits beginning at
+`0x880E`:
+
+```sh
+./rc2t render-graphics 0x880E 0x900E 4x4 --mode portraits
+```
+
+Portrait mode uses four images per row by default and labels each portrait with
+its starting ROM offset. The range must contain a whole number of portraits;
+the command above writes to `output/graphics.png`.
+
+The default sprite sheet uses 16 sprites per row. Its grayscale palette
+displays transparent color index 0 as black, while the inverted
+non-transparent palette displays index 3 as white. Portrait mode uses the
+grayscale palette observed on the POW screen.
 The output extension can be `.png`, `.jpg`, or `.jpeg`. Options include
-`--input` for a different ROM or full hex dump, `--columns` for sprites per
+`--input` for a different ROM or full hex dump, `--columns` for images per
 row, and `--scale` for nearest-neighbor enlargement. The specified output
 file is overwritten if it exists. You can also invoke
 `python3 bin/render_graphics.py` directly with the same range, output path,
-and options. When run without a range, `./rc2t render-graphics` applies this
-grouping to the entire ROM, including non-graphics data.
+and options. When run without a range, `./rc2t render-graphics` applies the
+default sprite grouping to the entire ROM, including non-graphics data.
 
 ## Swap character sprites
 
