@@ -113,7 +113,7 @@ default sprite grouping to the entire ROM, including non-graphics data.
 ## Swap character sprites
 
 To create an IPS patch that swaps two characters' nine standard poses, defeat
-sprite, and level-up face, run:
+sprite, level-up face, and POW-screen portrait, run:
 
 ```sh
 ./rc2t swap-character-sprite hero pit

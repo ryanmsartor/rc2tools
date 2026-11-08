@@ -23,6 +23,8 @@ class SwapCharacterSpriteWrapperTests(unittest.TestCase):
         rom[0x147:0x149] = b"\x06\x02"
         rom[0x9106:0x9346] = bytes([0x11]) * 0x240
         rom[0x9606:0x9846] = bytes([0x22]) * 0x240
+        rom[0x880E:0x890E] = bytes([0x33]) * 0x100
+        rom[0x890E:0x8A0E] = bytes([0x44]) * 0x100
         (self.root / "input" / "Rolan's Curse II (USA).gb").write_bytes(rom)
 
     def run_wrapper(self, *args):
@@ -46,6 +48,8 @@ class SwapCharacterSpriteWrapperTests(unittest.TestCase):
         patched_bytes = patched_rom.read_bytes()
         self.assertEqual(patched_bytes[0x9106], 0x22)
         self.assertEqual(patched_bytes[0x9606], 0x11)
+        self.assertEqual(patched_bytes[0x880E], 0x44)
+        self.assertEqual(patched_bytes[0x890E], 0x33)
 
     def test_unknown_character_fails_without_writing_patch(self):
         result = self.run_wrapper("swap-character-sprite", "hero", "unknown")

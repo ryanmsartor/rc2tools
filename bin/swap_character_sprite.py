@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Create an IPS patch swapping two characters' standard sprites."""
+"""Create an IPS patch swapping two characters' sprites and POW portraits."""
 
 import argparse
 import sys
@@ -11,19 +11,20 @@ ROOT = Path(__file__).resolve().parent.parent
 ROM_PATH = ROOT / "input" / "Rolan's Curse II (USA).gb"
 SPRITE_BYTES = 64
 STANDARD_SPRITE_BYTES = 9 * SPRITE_BYTES
+POW_PORTRAIT_BYTES = 0x100
 IPS_HEADER = b"PATCH"
 IPS_EOF = b"EOF"
 
-# Standard pose start, defeated sprite, and level-up face offsets.
+# Standard pose start, defeated sprite, level-up face, and POW portrait offsets.
 CHARACTER_SPRITES = {
-    "hero": (0x9106, 0x95C6, 0x860E),
-    "pit": (0x9606, 0x9A06, 0x864E),
-    "lane": (0x9A46, 0x9D86, 0x868E),
-    "kyle": (0x9DC6, 0xA206, 0x86CE),
-    "jude": (0xA306, 0xA786, 0x870E),
-    "lee": (0xA7C6, 0xAC86, 0x874E),
-    "lora": (0xACC6, 0xB0A6, 0x878E),
-    "zold": (0xB0E6, 0xB526, 0x87CE),
+    "hero": (0x9106, 0x95C6, 0x860E, 0x880E),
+    "pit": (0x9606, 0x9A06, 0x864E, 0x890E),
+    "lane": (0x9A46, 0x9D86, 0x868E, 0x8A0E),
+    "kyle": (0x9DC6, 0xA206, 0x86CE, 0x8B0E),
+    "jude": (0xA306, 0xA786, 0x870E, 0x8C0E),
+    "lee": (0xA7C6, 0xAC86, 0x874E, 0x8D0E),
+    "lora": (0xACC6, 0xB0A6, 0x878E, 0x8E0E),
+    "zold": (0xB0E6, 0xB526, 0x87CE, 0x8F0E),
 }
 
 
@@ -46,6 +47,7 @@ def build_swap_artifacts(
         (first[0], second[0], STANDARD_SPRITE_BYTES),
         (first[1], second[1], SPRITE_BYTES),
         (first[2], second[2], SPRITE_BYTES),
+        (first[3], second[3], POW_PORTRAIT_BYTES),
     )
     records = []
     for first_offset, second_offset, size in segments:

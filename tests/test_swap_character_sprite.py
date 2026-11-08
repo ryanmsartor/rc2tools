@@ -32,7 +32,7 @@ def parse_ips(patch):
 
 
 class SwapCharacterSpriteTests(unittest.TestCase):
-    def test_patch_swaps_only_the_eleven_sprite_regions(self):
+    def test_patch_swaps_sprite_regions_and_pow_portrait(self):
         rom = bytearray(0x20000)
         first = swap_character_sprite.CHARACTER_SPRITES["hero"]
         second = swap_character_sprite.CHARACTER_SPRITES["pit"]
@@ -40,6 +40,7 @@ class SwapCharacterSpriteTests(unittest.TestCase):
             (first[0], second[0], swap_character_sprite.STANDARD_SPRITE_BYTES),
             (first[1], second[1], swap_character_sprite.SPRITE_BYTES),
             (first[2], second[2], swap_character_sprite.SPRITE_BYTES),
+            (first[3], second[3], swap_character_sprite.POW_PORTRAIT_BYTES),
         )
         for index, (first_offset, second_offset, size) in enumerate(segments):
             rom[first_offset:first_offset + size] = bytes([0x10 + index]) * size
@@ -57,6 +58,8 @@ class SwapCharacterSpriteTests(unittest.TestCase):
                 second[1]: swap_character_sprite.SPRITE_BYTES,
                 first[2]: swap_character_sprite.SPRITE_BYTES,
                 second[2]: swap_character_sprite.SPRITE_BYTES,
+                first[3]: swap_character_sprite.POW_PORTRAIT_BYTES,
+                second[3]: swap_character_sprite.POW_PORTRAIT_BYTES,
             },
         )
 

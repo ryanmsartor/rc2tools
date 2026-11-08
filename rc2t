@@ -12,7 +12,7 @@ rc2t_print_help_message() {
     echo "  check-hash      Check the hash"
     echo "  extract-json    [rom-or-hex]  Extract character stats into output/<rom-sha256>.json"
     echo "  render-graphics [start [end [WxH|output]]] [options]  Render ROM tiles (default: entire ROM)"
-    echo "  swap-character-sprite <character1> <character2>  Write an IPS sprite-swap patch"
+    echo "  swap-character-sprite <character1> <character2>  Swap sprites and POW portraits"
 }
 
 _check_if_rom_exists() {

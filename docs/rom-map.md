@@ -66,6 +66,12 @@ The ROM has eight physical banks. The character tables described below are in ba
 
 The title is the only clear long ASCII string found in the initial string scan. Most game text, graphics, maps, and audio are likely stored as encoded or packed binary, so a plain-text scan cannot locate them. Some early bank bytes look table-like (for example, bank 2 starts with little-endian values `0x404E`, `0x408E`, `0x40CE`), but those are not yet proven pointers or assigned to any asset.
 
+### Bank 1 quarter-circle coordinate table
+
+Physical ROM offsets `0x4E77-0x4F66` (CPU addresses `0x4E77-0x4F66` with bank 1 selected) contain 15 records of 16 bytes each. Each record is eight little-endian 16-bit values, which form four `(x, y)` coordinate pairs. For example, the record at `0x4E97` is `(64, 0)`, `(59, 25)`, `(45, 45)`, `(25, 59)`. Across records, these pairs approximate points at 0°, 22.5°, 45°, and 67.5° on a quarter circle, with the first point's x-coordinate ranging from 16 to 768.
+
+This numeric structure is not raw 2bpp graphics data. It is likely a geometric/vector lookup table, but its units, consuming routine, and exact in-game use have not been established. The following code begins at `0x4F67`.
+
 ## Graphics and tile data (preliminary)
 
 The following identification is based on decoding bytes as Game Boy 2bpp tiles and matching them to screenshots. The tile matches confirm the format and the listed sprite tiles; descriptor fields are interpreted from their layout, but their consuming code has not been traced.
@@ -200,6 +206,28 @@ After the level-up faces and POW portraits, the intervening graphics are only pa
 | `0x95C6-0x9605` | Hero defeated |
 
 The sequence ends at `0x9605` inclusive; the next address is `0x9606` (CPU address `0x5606` with bank 2 selected).
+
+### Bank-1 copy and code overlays
+
+Physical bank-1 range `0x5286-0x5585` is aligned with the Hero graphics at bank-2 range `0x9286-0x9585` (the bank-1 offsets are `0x4000` lower). A byte-for-byte comparison finds 751 of the 768 bytes identical. The differing bytes are `0x5286-0x5290` and `0x5580-0x5585`.
+
+| Bank-1 range | Matching bank-2 range | Contents |
+|---|---|---|
+| `0x5291-0x52C5` | `0x9291-0x92C5` | Tail of Hero attacking down; the preceding 11 bytes are overwritten |
+| `0x52C6-0x5305` | `0x92C6-0x9305` | Hero attacking up |
+| `0x5306-0x5345` | `0x9306-0x9345` | Hero attacking left |
+| `0x5346-0x5385` | `0x9346-0x9385` | Hero sword, downward |
+| `0x5386-0x53C5` | `0x9386-0x93C5` | Hero sword, upward |
+| `0x53C6-0x5405` | `0x93C6-0x9405` | Hero sword, left |
+| `0x5406-0x557F` | `0x9406-0x957F` | First five and most of the sixth sword-arc sprite-equivalent; the final six bytes are overwritten |
+
+The first differing run is part of a code sequence that ends with `RET` (`0xC9`) at `0x5290`. The last six bytes, `0x5580-0x5585`, are two `JP` instructions to `0x55C0` and `0x55AA`, not sprite data. Fixed-bank code contains calls to CPU addresses `0x5580` and `0x5583` at ROM offsets `0x04FD` and `0x0517`.
+
+Static bank-state tracing resolves the apparent data pointers into this range as references to other banks: for example, the pointer `0x5382` is later dereferenced after selecting bank 5, and the pointer `0x5449` is dereferenced after the bank-5 selection at `0x1D77`. The `0x53E1` reads are in helpers called while bank 5 is selected, and the pointer table at `0x4ACB` is consumed after switching to bank 5. These do not show the copied bank-1 graphics being loaded as graphics.
+
+A raw scan initially suggested a `CALL 0x54EA` at ROM offset `0x1950`, which would have been bank-sensitive. This is a false positive: the `0xCD` byte is the immediate operand of the preceding `LDH A,(0xFFCD)` instruction at `0x194F`, not a `CALL` opcode. No control flow to `0x54EA` is established by that byte sequence. Based on the traced references, there is no confirmed read of the interior bank-1 copy as graphics; static analysis is not a runtime proof against every indirect or data-driven access. Startup also selects bank 1 before calling `0x5586`, immediately after this range, so the interval as a whole is not dead code.
+
+The per-reference bank-state audit and its limitations are recorded in the [bank-1 copy reference audit](./rom-map-bank1-copy-reference-audit.md).
 
 ### Pit animation and weapon sprites
 
