@@ -60,7 +60,7 @@ class RenderGraphicsWrapperTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         with Image.open(self.root / "output" / "graphics.png") as image:
             colors = [color for _, color in image.getcolors(image.width * image.height)]
-            self.assertIn((0, 0, 255), colors)
+            self.assertTrue(any(r == g < b for r, g, b in colors))
 
     def test_start_and_end_accept_highlight_known_without_output_path(self):
         rom_path = self.root / "input" / "Rolan's Curse II (USA).gb"
@@ -74,7 +74,7 @@ class RenderGraphicsWrapperTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         with Image.open(self.root / "output" / "graphics.png") as image:
             colors = [color for _, color in image.getcolors(image.width * image.height)]
-            self.assertIn((0, 0, 255), colors)
+            self.assertTrue(any(r == g < b for r, g, b in colors))
 
     def test_positional_tile_grid_renders_to_default_output(self):
         result = self.run_wrapper(

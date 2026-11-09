@@ -12,7 +12,7 @@ rc2t_print_help_message() {
     echo "  check-hash      Check the hash"
     echo "  extract-json    [rom-or-hex]  Extract character stats into output/<rom-sha256>.json"
     echo "  render-graphics [start [end [WxH|output]]] [options]  Render ROM tiles (default: entire ROM)"
-    echo "    --highlight-known  Paint documented sprite tiles solid blue"
+    echo "    --highlight-known  Shade documented graphics in blue and text in yellow"
     echo "    --stacked-glyphs   Render 16-byte tiles as two stacked 1bpp glyphs"
     echo "  swap-character-sprite <character1> <character2>  Swap sprites and POW portraits"
 }

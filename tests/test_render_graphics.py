@@ -16,6 +16,28 @@ render_graphics = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(render_graphics)
 
 
+def blue_count(colors):
+    """Count pixels from a {color: count} mapping that use a bluescale shade."""
+    return sum(
+        count
+        for color, count in colors.items()
+        if color in render_graphics.BLUESCALE_PALETTE
+    )
+
+
+def yellow_count(colors):
+    """Count pixels from a {color: count} mapping that use a yellowscale shade."""
+    return sum(
+        count
+        for color, count in colors.items()
+        if color in render_graphics.YELLOWSCALE_PALETTE
+    )
+
+
+def color_counts(image):
+    return {color: count for count, color in image.getcolors(image.width * image.height)}
+
+
 class RenderGraphicsTests(unittest.TestCase):
     def test_parses_tile_grid_dimensions(self):
         self.assertEqual(render_graphics.parse_tile_grid("2x3"), (2, 3))
@@ -103,7 +125,7 @@ class RenderGraphicsTests(unittest.TestCase):
             for count, color in image.getcolors(image.width * image.height)
         }
         self.assertEqual(colors[render_graphics.DEFAULT_PALETTE[1]], 120)
-        self.assertEqual(colors[render_graphics.HIGHLIGHT_COLOR], 8)
+        self.assertEqual(blue_count(colors), 8)
 
     def test_partial_sprite_edge_tiles_do_not_highlight_overlapping_code(self):
         tile = bytes([0xFF]) * render_graphics.TILE_BYTES
@@ -133,10 +155,10 @@ class RenderGraphicsTests(unittest.TestCase):
             color: count
             for count, color in back.getcolors(back.width * back.height)
         }
-        self.assertEqual(front_colors[render_graphics.HIGHLIGHT_COLOR], 16)
-        self.assertEqual(back_colors[render_graphics.HIGHLIGHT_COLOR], 40)
+        self.assertEqual(blue_count(front_colors), 16)
+        self.assertEqual(blue_count(back_colors), 40)
 
-    def test_highlights_graphics_through_bb05_but_not_bb06(self):
+    def test_highlights_graphics_through_bc85_but_not_bc86(self):
         first_glyph = render_graphics.render_tile_grid(
             bytes(render_graphics.TILE_BYTES),
             1,
@@ -188,7 +210,7 @@ class RenderGraphicsTests(unittest.TestCase):
             1,
             columns=1,
             scale=1,
-            start_address=0xBB06,
+            start_address=0xBC86,
             highlight_known=True,
         )
         first_colors = {
@@ -201,36 +223,36 @@ class RenderGraphicsTests(unittest.TestCase):
                 boundary_tile.width * boundary_tile.height
             )
         }
-        self.assertEqual(first_colors[render_graphics.HIGHLIGHT_COLOR], 64)
+        self.assertEqual(blue_count(first_colors), 64)
         first_ui_colors = {
             color: count
             for count, color in first_ui_tile.getcolors(
                 first_ui_tile.width * first_ui_tile.height
             )
         }
-        self.assertEqual(first_ui_colors[render_graphics.HIGHLIGHT_COLOR], 64)
+        self.assertEqual(blue_count(first_ui_colors), 64)
         first_frame_colors = {
             color: count
             for count, color in first_frame_tile.getcolors(
                 first_frame_tile.width * first_frame_tile.height
             )
         }
-        self.assertEqual(first_frame_colors[render_graphics.HIGHLIGHT_COLOR], 64)
+        self.assertEqual(blue_count(first_frame_colors), 64)
         first_item_colors = {
             color: count
             for count, color in first_item_tile.getcolors(
                 first_item_tile.width * first_item_tile.height
             )
         }
-        self.assertEqual(first_item_colors[render_graphics.HIGHLIGHT_COLOR], 64)
-        self.assertEqual(boundary_colors[render_graphics.HIGHLIGHT_COLOR], 64)
+        self.assertEqual(blue_count(first_item_colors), 64)
+        self.assertEqual(blue_count(boundary_colors), 64)
         after_range_colors = {
             color: count
             for count, color in after_range_tile.getcolors(
                 after_range_tile.width * after_range_tile.height
             )
         }
-        self.assertNotIn(render_graphics.HIGHLIGHT_COLOR, after_range_colors)
+        self.assertEqual(blue_count(after_range_colors), 0)
 
     def test_stacked_glyphs_render_each_half_as_one_glyph(self):
         # Bit 0 is ink, so 0x00 is solid black and 0xFF is blank.
@@ -246,13 +268,68 @@ class RenderGraphicsTests(unittest.TestCase):
     def test_stacked_glyphs_highlight_only_known_rows(self):
         tile = bytes([0xFF] * render_graphics.TILE_BYTES)
         image = render_graphics.render_stacked_glyphs(
-            tile, columns=1, scale=1, start_address=0xBB00, highlight_known=True
+            tile, columns=1, scale=1, start_address=0xBC80, highlight_known=True
         )
         colors = {color: count for count, color in image.getcolors(image.width * image.height)}
-        # Rows at 0xBB00-0xBB05 are inside the known range; 0xBB06-0xBB0F are not.
-        self.assertEqual(colors[render_graphics.HIGHLIGHT_COLOR], 48)
+        # Rows at 0xBC80-0xBC85 are inside the known range; 0xBC86-0xBC8F are not.
+        self.assertEqual(blue_count(colors), 48)
 
 
+        with self.assertRaisesRegex(ValueError, "start address is required"):
+            render_graphics.render_tile_grid(
+                bytes(render_graphics.TILE_BYTES),
+                1,
+                1,
+                highlight_known=True,
+            )
+
+    def test_bluescale_keeps_each_palette_shade_distinct(self):
+        # Row 0 uses all four color indices: 3, 3, 1, 1, 2, 2, 0, 0.
+        tile = bytes([0xF0, 0xCC]) + bytes(render_graphics.TILE_BYTES - 2)
+        image = render_graphics.render_tile_grid(
+            tile, 1, 1, columns=1, scale=1, start_address=0xBB00, highlight_known=True
+        )
+        colors = {color for _, color in image.getcolors(image.width * image.height)}
+        blue_colors = {color for color in colors if color in render_graphics.BLUESCALE_PALETTE}
+        self.assertEqual(blue_colors, set(render_graphics.BLUESCALE_PALETTE))
+
+    def test_text_ranges_shade_in_yellow(self):
+        tile = bytes([0xFF] * render_graphics.TILE_BYTES)
+        credits = render_graphics.render_tile_grid(
+            tile, 1, 1, columns=1, scale=1, start_address=0xBC86, highlight_known=True
+        )
+        title = render_graphics.render_tile_grid(
+            tile, 1, 1, columns=1, scale=1, start_address=0x0134, highlight_known=True
+        )
+        credits_colors = color_counts(credits)
+        self.assertEqual(yellow_count(credits_colors), 64)
+        self.assertEqual(blue_count(credits_colors), 0)
+        self.assertEqual(yellow_count(color_counts(title)), 64)
+
+    def test_text_highlight_stops_at_its_end_address(self):
+        tile = bytes([0xFF] * render_graphics.TILE_BYTES)
+        # Bytes 0xBFA8-0xBFAB are text; 0xBFAC onward is not.
+        image = render_graphics.render_tile_grid(
+            tile, 1, 1, columns=1, scale=1, start_address=0xBFA8, highlight_known=True
+        )
+        self.assertEqual(yellow_count(color_counts(image)), 16)
+        self.assertEqual(blue_count(color_counts(image)), 0)
+
+    def test_mixed_planes_use_the_plane_that_owns_each_pixel(self):
+        # Low byte is graphics, high byte is text: pixels from each plane take that shade.
+        self.assertEqual(
+            render_graphics.pixel_highlight_palette("graphics", "text", True, False),
+            render_graphics.BLUESCALE_PALETTE,
+        )
+        self.assertEqual(
+            render_graphics.pixel_highlight_palette("graphics", "text", False, True),
+            render_graphics.YELLOWSCALE_PALETTE,
+        )
+        self.assertIsNone(
+            render_graphics.pixel_highlight_palette("graphics", "text", True, True)
+        )
+
+    def test_highlighting_requires_a_start_address(self):
         with self.assertRaisesRegex(ValueError, "start address is required"):
             render_graphics.render_tile_grid(
                 bytes(render_graphics.TILE_BYTES),
@@ -380,7 +457,7 @@ class RenderGraphicsTests(unittest.TestCase):
                 self.assertEqual(render_graphics.main(), 0)
             with Image.open(output_path) as image:
                 colors = [color for _, color in image.getcolors(image.width * image.height)]
-                self.assertIn(render_graphics.HIGHLIGHT_COLOR, colors)
+                self.assertTrue(any(color in render_graphics.BLUESCALE_PALETTE for color in colors))
 
     def test_cli_highlights_known_tiles_in_custom_grid(self):
         rom = bytearray(0x20000)
@@ -402,7 +479,7 @@ class RenderGraphicsTests(unittest.TestCase):
                 self.assertEqual(render_graphics.main(), 0)
             with Image.open(output_path) as image:
                 colors = [color for _, color in image.getcolors(image.width * image.height)]
-                self.assertIn(render_graphics.HIGHLIGHT_COLOR, colors)
+                self.assertTrue(any(color in render_graphics.BLUESCALE_PALETTE for color in colors))
 
     def test_cli_highlights_known_tiles_in_portrait_mode(self):
         rom = bytearray(0x20000)
@@ -424,7 +501,7 @@ class RenderGraphicsTests(unittest.TestCase):
                 self.assertEqual(render_graphics.main(), 0)
             with Image.open(output_path) as image:
                 colors = [color for _, color in image.getcolors(image.width * image.height)]
-                self.assertIn(render_graphics.HIGHLIGHT_COLOR, colors)
+                self.assertTrue(any(color in render_graphics.BLUESCALE_PALETTE for color in colors))
 
     def test_cli_writes_png_for_a_rom_range(self):
         rom = bytearray(0x20000)

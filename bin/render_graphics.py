@@ -16,7 +16,20 @@ SPRITE_TILE_POSITIONS = ((0, 0), (0, 1), (1, 0), (1, 1))
 SPRITE_WIDTH = TILE_WIDTH * 2
 SPRITE_GUTTER = 1
 GUTTER_COLOR = (192, 192, 192)
-HIGHLIGHT_COLOR = (0, 0, 255)
+# Known pixels keep their palette shade, mapped to blue (index 0 is darkest, 3 lightest).
+BLUESCALE_PALETTE = (
+    (0, 0, 96),
+    (0, 0, 160),
+    (96, 96, 224),
+    (192, 192, 255),
+)
+# Known text pixels use the same scheme in yellow.
+YELLOWSCALE_PALETTE = (
+    (96, 96, 0),
+    (160, 160, 0),
+    (224, 224, 96),
+    (255, 255, 192),
+)
 PORTRAIT_TILE_COLUMNS = 4
 PORTRAIT_TILE_COUNT = PORTRAIT_TILE_COLUMNS ** 2
 PORTRAIT_BYTES = PORTRAIT_TILE_COUNT * TILE_BYTES
@@ -25,8 +38,42 @@ PORTRAIT_WIDTH = PORTRAIT_TILE_COLUMNS * TILE_WIDTH
 KNOWN_GRAPHICS_RANGES = (
     (0x5291, 0x5580),
     (0x804E, 0x900E),
-    (0x9106, 0xBB06),
+    (0x9106, 0xBC86),
+    (0x1A6AE, 0x1B0FE),
 )
+# Exclusive physical-ROM ranges of documented text, shaded in yellow.
+KNOWN_TEXT_RANGES = (
+    (0x0134, 0x0144),
+    (0xBC86, 0xBFAC),
+)
+HIGHLIGHT_PALETTES = {"graphics": BLUESCALE_PALETTE, "text": YELLOWSCALE_PALETTE}
+
+
+def known_kind(address: int) -> str | None:
+    if any(start <= address < end for start, end in KNOWN_GRAPHICS_RANGES):
+        return "graphics"
+    if any(start <= address < end for start, end in KNOWN_TEXT_RANGES):
+        return "text"
+    return None
+
+
+def pixel_highlight_palette(
+    low_kind: str | None, high_kind: str | None, low_set: bool, high_set: bool
+) -> tuple | None:
+    """Return the shade palette for a pixel, or None to keep its palette color.
+
+    A pixel belongs to whichever plane's byte sets its bit, so a row that is only
+    partly known highlights only the pixels its known byte contributes.
+    """
+    if low_kind == high_kind:
+        owner = low_kind
+    elif low_kind and low_set and not high_set:
+        owner = low_kind
+    elif high_kind and high_set and not low_set:
+        owner = high_kind
+    else:
+        owner = None
+    return HIGHLIGHT_PALETTES[owner] if owner else None
 DEFAULT_ROM = Path(__file__).resolve().parent.parent / "input" / "Rolan's Curse II (USA).gb"
 DEFAULT_PALETTE = (
     (0, 0, 0),
@@ -225,27 +272,17 @@ def render_tile_grid(
         for y, row in enumerate(tile):
             low_byte, high_byte = tile_data[y * 2:y * 2 + 2]
             row_address = tile_start + y * 2
-            low_known = highlight_known and any(
-                known_start <= row_address < known_end
-                for known_start, known_end in KNOWN_GRAPHICS_RANGES
-            )
-            high_known = highlight_known and any(
-                known_start <= row_address + 1 < known_end
-                for known_start, known_end in KNOWN_GRAPHICS_RANGES
-            )
+            low_kind = known_kind(row_address) if highlight_known else None
+            high_kind = known_kind(row_address + 1) if highlight_known else None
             for x, color in enumerate(row):
                 bit_mask = 1 << (7 - x)
-                if low_known and high_known:
-                    highlight_pixel = True
-                elif low_known:
-                    highlight_pixel = bool(low_byte & bit_mask) and not (high_byte & bit_mask)
-                elif high_known:
-                    highlight_pixel = bool(high_byte & bit_mask) and not (low_byte & bit_mask)
-                else:
-                    highlight_pixel = False
-                pixels[tile_x + x, tile_y + y] = (
-                    HIGHLIGHT_COLOR if highlight_pixel else palette[color]
+                shades = pixel_highlight_palette(
+                    low_kind,
+                    high_kind,
+                    bool(low_byte & bit_mask),
+                    bool(high_byte & bit_mask),
                 )
+                pixels[tile_x + x, tile_y + y] = shades[color] if shades else palette[color]
 
     if scale > 1:
         image = image.resize((image.width * scale, image.height * scale), Image.Resampling.NEAREST)
@@ -352,14 +389,13 @@ def render_stacked_glyphs(
             row_address = (
                 start_address + tile_index * TILE_BYTES + y if start_address is not None else None
             )
-            row_known = highlight_known and any(
-                known_start <= row_address < known_end
-                for known_start, known_end in KNOWN_GRAPHICS_RANGES
-            )
+            row_kind = known_kind(row_address) if highlight_known else None
             for x in range(TILE_WIDTH):
-                if row_known:
-                    color = HIGHLIGHT_COLOR
-                elif row_byte & (1 << (7 - x)):
+                ink = row_byte & (1 << (7 - x))
+                if row_kind:
+                    shades = HIGHLIGHT_PALETTES[row_kind]
+                    color = shades[3] if ink else shades[0]
+                elif ink:
                     color = palette[3]
                 else:
                     color = palette[0]
@@ -407,7 +443,7 @@ def main() -> int:
     parser.add_argument(
         "--highlight-known",
         action="store_true",
-        help="paint tiles overlapping documented sprite areas solid blue",
+        help="shade pixels in documented graphics in blue and documented text in yellow",
     )
     parser.add_argument(
         "--stacked-glyphs",

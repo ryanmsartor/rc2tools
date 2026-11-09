@@ -71,21 +71,22 @@ assembled sprites, pass the range and output path:
 ./rc2t render-graphics 0x9106 0xB566 output/hero-sprites.png
 ```
 
-Pass `--highlight-known` to paint documented graphics blue, making unmapped
-tiles easier to spot:
+Pass `--highlight-known` to shade documented graphics in blue and documented text
+in yellow, making unmapped tiles easier to spot. Known pixels keep their relative
+brightness, so dark, mid, and light pixels stay distinguishable:
 
 ```sh
 ./rc2t render-graphics --highlight-known
 ./rc2t render-graphics 0x9100 0x9200 output/scan.png --highlight-known
 ```
 
-The highlighted physical-ROM ranges follow the graphics documented in
+The highlighted physical-ROM ranges follow the graphics and text documented in
 [the ROM map](./docs/rom-map.md). Highlighting follows the known byte ranges,
 even when a range starts or ends inside a rendered tile. A pixel is blue when
-its color data comes only from bytes inside a known range; if only one of a
-tile row's two bitplane bytes is known, only pixels attributable to that byte
-are blue. Portrait, sprite, and custom tile-grid layouts all use the same
-ranges.
+its color data comes only from bytes inside a known graphics range, and yellow
+when it comes only from a known text range. If only one of a tile row's two
+bitplane bytes is known, only pixels attributable to that byte are shaded.
+Portrait, sprite, and custom tile-grid layouts all use the same ranges.
 
 Offsets are physical ROM offsets. Each 16-byte tile is decoded as 8×8 pixels;
 every four consecutive tiles are assembled into one 16×16 sprite in

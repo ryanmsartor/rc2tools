@@ -521,6 +521,54 @@ Whether the game's loader uses this exact layout is not yet verified; it is the 
 
 The two final parenthesis tiles may be used to indicate a highlight or something else - I (Ryan) don't recall ever seeing them used in game. The stacking itself is clear, but the characters' usage in the game's text has not been traced.
 
+### Healing item and energy sprites
+
+Four 2×2 sprites (64 bytes each) follow the stacked glyphs. Unlike the stockable items, these take effect immediately rather than entering the inventory, per in-game observation.
+
+| Physical ROM range | Contents |
+|---|---|
+| `0xBB06-0xBB45` | Small MP fruit |
+| `0xBB46-0xBB85` | Large MP fruit |
+| `0xBB86-0xBBC5` | Small healing potion |
+| `0xBBC6-0xBC05` | Small healing potion on a solid background instead of transparent (the grayscale render does not show this difference, so it is from in-game observation; the source of the background is not traced) |
+
+Four 1×1 tiles and one 2×2 sprite follow:
+
+| Physical ROM range | Contents |
+|---|---|
+| `0xBC06-0xBC15` | 1×1 light energy particle |
+| `0xBC16-0xBC25` | 1×1 dark energy particle |
+| `0xBC26-0xBC35` | Top half of the left side of a medium-light energy ball |
+| `0xBC36-0xBC45` | Bottom half of the left side of a medium-light energy ball |
+| `0xBC46-0xBC85` | Large light energy ball (2×2) |
+
+These sprites occupy `0xBB06-0xBC85` inclusive. The descriptor source table above stops at `0xBB05`, so the source pointers for this run have not been traced. They are included in `--highlight-known`.
+
+### Ending credits text (compressed)
+
+Bytes starting at `0xBC86` are not machine code. Decoding them with a one-byte character table gives English text. The table below is inferred from that decode and is not confirmed against the game's text routine:
+
+| Byte | Meaning |
+|---|---|
+| `0x0A-0x23` | `A`-`Z` (`0x0A` = `A`) |
+| `0xB2` | Space |
+| `0x24` | Apostrophe (`KYLE'S`) |
+| `0x27` | `!` (`NOW!!`, `OTHER!!`) |
+| `0x28` | Probably a comma (`VILLAGE, AND`); not certain |
+| `0xFD` | Word separator; it appears between words and at sentence ends, so it is not a plain period. Shown as `[FD]` below |
+| `0xFF` | End of a text segment |
+| `0xE0-0xE3` | Hero name placeholder (`THE LEGEND OF [E0][E1][E2][E3]`); the name itself is not resolved |
+| Other bytes (`0xDF`, `0xE4`, `0xE5`, `0xEB`, `0xEC`, `0xEE`, `0x2A`, `0x7D`, `0x84`, `0xBF`, `0x04`, and others) | Control codes; not resolved |
+
+Segments found so far:
+
+| Physical ROM range | Text |
+|---|---|
+| `0xBC86-0xBD1D` | Opening summary: `EVIL KING BARIUS[FD]IS DEFEATED[FD]AND[FD]HIS PLOT TO REGAIN[DF]HIS EVIL GRASP ON[FD]THE WORLD IS ENDED[FD]FOR NOW!![DF]THE WARRIORS BID[FD]FAREWELL TO EACH[FD]OTHER!!` |
+| `0xBD1E-0xBFAB` | Ending credits, one line per party member: Pit, Lane, Kyle, Jude, Lee, Lora, and Zold, each ending with a short line about their life after the story, followed by `[E0][E1][E2][E3]` and a closing line about `THE LEGEND OF [E0][E1][E2][E3]` |
+
+The last credits segment ends at `0xBFAB`, with `0x2A` at `0xBFAC`. The bytes after that are control codes and non-text data, up to a `0xFF` at `0xBFDB`. Where the credits data ends and what reads these bytes is not yet traced. The credits text (`0xBC86-0xBFAB`) and the cartridge title (`0x0134-0x0143`) are the documented text ranges; `--highlight-known` shades them in yellow rather than blue.
+
 ### Main bank-2 tile-data batch
 
 A sequence of eight 8-byte records at `0x9024-0x9063` appears to contain a length, a bank-2 CPU source address, a VRAM destination (`0x8000` in each record), and two zero bytes. Interpreting those fields this way yields eight contiguous source ranges:
