@@ -544,30 +544,73 @@ Four 1×1 tiles and one 2×2 sprite follow:
 
 These sprites occupy `0xBB06-0xBC85` inclusive. The descriptor source table above stops at `0xBB05`, so the source pointers for this run have not been traced. They are included in `--highlight-known`.
 
-### Ending credits text (compressed)
+### Ending credits text
 
-Bytes starting at `0xBC86` are not machine code. Decoding them with a one-byte character table gives English text. The table below is inferred from that decode and is not confirmed against the game's text routine:
+The ending credits at `0xBC86-0xBFAB` are documented in [the known-text document](./known-text.md), along with the character table, the cartridge title, and the dialogue strings. Those ranges are shaded in yellow by `--highlight-known`.
 
-| Byte | Meaning |
+### Terrain and world-object tiles (preliminary)
+
+The range `0xC46A-0xE259` (7,664 bytes, exactly 479 16-byte 2bpp tiles) contains terrain sprites and tiles: the nonpassable objects that make up the overworld and dungeons, which the character cannot walk through. A rendered sample shows tile-style artwork rather than code or text. The range is included in `--highlight-known`. NPC and enemy sprites begin at `0xE25A`; see the section below.
+
+This is a coarse range, not a map. Individual tile and sprite boundaries, how they are grouped into terrain objects, the tile-map and collision data that reference them, and the routines that load them have not been traced. Go back and map this range more thoroughly later.
+
+### NPC, enemy, and orb sprites (preliminary)
+
+The range `0xE25A-0xFD59` (6,912 bytes, exactly 432 16-byte 2bpp tiles) contains NPC and enemy sprites, arranged as 16×16 sprites of four tiles each. The rendered sample shows character-like and creature-like artwork rather than code or text. It is included in `--highlight-known`.
+
+The last two tiles of the artwork are a light and a dark energy orb, 1×1 tiles each:
+
+| Physical ROM range | Contents |
 |---|---|
-| `0x0A-0x23` | `A`-`Z` (`0x0A` = `A`) |
-| `0xB2` | Space |
-| `0x24` | Apostrophe (`KYLE'S`) |
-| `0x27` | `!` (`NOW!!`, `OTHER!!`) |
-| `0x28` | Probably a comma (`VILLAGE, AND`); not certain |
-| `0xFD` | Word separator; it appears between words and at sentence ends, so it is not a plain period. Shown as `[FD]` below |
-| `0xFF` | End of a text segment |
-| `0xE0-0xE3` | Hero name placeholder (`THE LEGEND OF [E0][E1][E2][E3]`); the name itself is not resolved |
-| Other bytes (`0xDF`, `0xE4`, `0xE5`, `0xEB`, `0xEC`, `0xEE`, `0x2A`, `0x7D`, `0x84`, `0xBF`, `0x04`, and others) | Control codes; not resolved |
+| `0xFD5A-0xFD69` | Light orb (1×1 tile) |
+| `0xFD6A-0xFD79` | Dark orb (1×1 tile) |
 
-Segments found so far:
+The bytes from `0xFD7A` onward do not look like 2bpp artwork. They repeat 4-byte groups, such as `34 00 08 00`, `35 00 00 08`, and `36 00 08 08`. The second byte of each group is often `0x00` or `0x20`, and tile numbers climb through runs such as `0x34-0x37` and `0x28-0x2B`. This pattern fits sprite-part records (position offsets, tile number, and attributes) that would assemble multi-tile sprites, but this is unconfirmed. The records are not in `--highlight-known` yet, and the end of this data has not been found.
 
-| Physical ROM range | Text |
+Individual sprite boundaries, which NPC or enemy each sprite belongs to, the record format, and the routines or tables that reference them have not been traced. Go back and map this range more thoroughly later.
+
+### Chest, junk, house, and terrain tiles (preliminary)
+
+The range `0x1811E-0x1861D` (1,280 bytes, 80 16-byte 2bpp tiles) holds 2×2 sprites and terrain. Each 2×2 sprite is 64 bytes. The rendered sample shows tile artwork, not code or text.
+
+| Physical ROM range | Contents |
 |---|---|
-| `0xBC86-0xBD1D` | Opening summary: `EVIL KING BARIUS[FD]IS DEFEATED[FD]AND[FD]HIS PLOT TO REGAIN[DF]HIS EVIL GRASP ON[FD]THE WORLD IS ENDED[FD]FOR NOW!![DF]THE WARRIORS BID[FD]FAREWELL TO EACH[FD]OTHER!!` |
-| `0xBD1E-0xBFAB` | Ending credits, one line per party member: Pit, Lane, Kyle, Jude, Lee, Lora, and Zold, each ending with a short line about their life after the story, followed by `[E0][E1][E2][E3]` and a closing line about `THE LEGEND OF [E0][E1][E2][E3]` |
+| `0x1811E-0x1815D` | Chest (2×2 sprite) |
+| `0x1815E-0x1819D` | Destructible junk (2×2 sprite) |
+| `0x1819E-0x1829D` | House pieces seen inside towns: top left, top right, bottom left, and bottom right (four 2×2 blocks) |
+| `0x1829E-0x1861D` | More terrain tiles |
 
-The last credits segment ends at `0xBFAB`, with `0x2A` at `0xBFAC`. The bytes after that are control codes and non-text data, up to a `0xFF` at `0xBFDB`. Where the credits data ends and what reads these bytes is not yet traced. The credits text (`0xBC86-0xBFAB`) and the cartridge title (`0x0134-0x0143`) are the documented text ranges; `--highlight-known` shades them in yellow rather than blue.
+The chest and junk are described from the user's observation and matched against the render. The house split is inferred from the block size. Terrain tile and sprite boundaries in this range have not been traced. Go back and map this range more thoroughly later.
+
+### Idle NPC sprites (preliminary)
+
+The range `0x1861E-0x18A1D` (1,024 bytes, 16 2×2 sprites of 64 bytes each) holds two idle-animation frames for each of eight townsfolk, in this order: elder, egghead, man, woman, child, dog, chicken, and frog. Each NPC's two frames are consecutive 64-byte sprites: the elder is at `0x1861E` and `0x1865E`, the egghead at `0x1869E` and `0x186DE`, and so on through the frog at `0x1899E` and `0x189DE`.
+
+The pairing is inferred from the bytes. Adjacent frames differ by 41 to 108 bits, while frames 8 sprites apart differ by 154 to 189. The NPC identities come from the user's observation, and the rendered sprites are not checked against them.
+
+### Boss sprites (tentative)
+
+The range `0x18A1E-0x1A6AD` (7,312 bytes, exactly 457 16-byte 2bpp tiles) holds the bosses of the game. The rendered sample shows large tile artwork rather than code or text. It is marked as known in `--highlight-known`.
+
+The addresses are tentative. Individual boss boundaries, their animation frames, and the tables that reference them have not been traced, so this section does not list per-boss offsets. The range ends where the title-screen art begins at `0x1A6AE`.
+
+### Map-screen tiles (tentative)
+
+The range `0x17185-0x17724` (1,440 bytes, 90 16-byte 2bpp tiles) holds graphics that are probably used for the map screen. The 16-byte lookup table at `0x17175-0x17184` ends right before it, and the tile grid starts exactly at `0x17185`. Starting there puts every tile boundary on a 16-byte step, so the bytes are not shifted.
+
+Tiles within the range, aligned to that grid:
+
+| Physical ROM range | Contents |
+|---|---|
+| `0x176C5-0x176D4` | Right-facing arrow |
+| `0x176D5-0x176E4` | Left-facing arrow |
+| `0x176E5-0x176F4` | "ED" symbol (the "end" key when entering the player's name) |
+| `0x176F5-0x1770C` | Blank or near-blank tiles, not identified |
+| `0x17715-0x17724` | Downward cursor, likely the prompt to press A to continue scrolling text (interpretation unconfirmed) |
+
+Tiles from about `0x17305` through `0x17704` have repeated vertical-stripe patterns with long runs of identical bytes. It is not clear whether they are graphics or some other encoding, so the range includes them tentatively. From `0x17725` the bytes switch to runs of tile numbers, such as `9C B9 90 91 92 93`, which look like a tile map. That data is not in the range.
+
+The usage on the map screen has not been confirmed, and the tiles have not been traced to a loader. Go back and check the stripe area and the tile map later.
 
 ### Main bank-2 tile-data batch
 
@@ -675,6 +718,8 @@ Two more arrays follow the character MP tables. Each has eight two-byte entries.
 | Lookup at `0x17165` | `0x17165-0x17174` | `00/01 02/04 05/06 08/09 0B/0D 0E/10 11/12 14/16` |
 | Lookup at `0x17175` | `0x17175-0x17184` | `00/01 03/04 05/07 08/0A 0C/0D 0E/0F 11/13 15/16` |
 
+These lookup tables and the character stat and ability tables above are shaded in green by `--highlight-known`.
+
 Fixed-bank code at `0x009DE-0x009EB` loads one of these table bases (`0x7165` or `0x7175` in the banked CPU window), indexes with the value previously read from `0xC3F8` using a two-byte stride, reads the first byte of that pair, and stores it at `0xC340`. The branch selecting the base depends on flags from a preceding helper call operating on work RAM at `0xC405`; the meaning of that state and what the lookup result represents have not been identified. The banked CPU addresses correspond to the listed physical offsets when ROM bank 5 is selected.
 
 **Boundary and interpretation caveats:**
@@ -692,7 +737,7 @@ Fixed-bank code at `0x009DE-0x009EB` loads one of these table bases (`0x7165` or
 | Runtime variables / character state | CPU addresses and the code that updates them are not yet established. See the separate save analysis for observed saved fields. |
 | Character templates / stats | HP, MP, attack, and ability tables are identified from the annotated dump in bank 5 above; consumers and some field meanings/boundaries remain to be verified. Other character data is not yet located. |
 | Maps / collision / encounters | No ROM file offsets or table format confirmed. |
-| Text / character graphics | The cartridge title is at `0x0134-0x0143`; title-screen graphics in bank 6 and character graphics in bank 2 are documented above. The title screen's tilemap and palette, dialogue/text tables, and the routines that consume graphics descriptors remain unidentified. |
+| Text / character graphics | The cartridge title is at `0x0134-0x0143`; title-screen graphics in bank 6 and character graphics in bank 2 are documented above. The title screen's tilemap and palette, the routines that consume text, and the routines that consume graphics descriptors remain unidentified. Known text ranges are listed in [the known-text document](./known-text.md). |
 | Audio / music / sound effects | No code or data ranges identified yet. Game Boy sound registers are in `0xFF10-0xFF3F`, but that hardware fact does not identify the ROM routines or music data. |
 
 ## Next steps to turn this into a byte-level map

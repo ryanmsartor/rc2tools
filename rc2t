@@ -8,12 +8,13 @@ rc2t_print_help_message() {
     echo "Usage: $(basename "$0") <command>"
     echo ""
     echo "Commands:"
-    echo "  dump-hex        Dump the contents in hexadecimal"
-    echo "  check-hash      Check the hash"
-    echo "  extract-json    [rom-or-hex]  Extract character stats into output/<rom-sha256>.json"
-    echo "  render-graphics [start [end [WxH|output]]] [options]  Render ROM tiles (default: entire ROM)"
-    echo "    --highlight-known  Shade documented graphics in blue and text in yellow"
+    echo "  dump-hex            Dump the contents in hexadecimal"
+    echo "  check-hash          Check the hash"
+    echo "  extract-json        [rom-or-hex]  Extract character stats into output/<rom-sha256>.json"
+    echo "  render-graphics | rg [start [end [WxH|output]]] [options]  Render ROM tiles (default: entire ROM)"
+    echo "    --highlight-known  Shade documented graphics in blue, text in yellow, and lookup or stat tables in green"
     echo "    --stacked-glyphs   Render 16-byte tiles as two stacked 1bpp glyphs"
+    echo "  render-text         Decode the entire ROM into output/rom-text.txt as one string"
     echo "  swap-character-sprite <character1> <character2>  Swap sprites and POW portraits"
 }
 
@@ -56,7 +57,7 @@ case "$1" in
         python3 bin/extract_json.py "${@:2}"
         ;;
 
-    render-graphics)
+    render-graphics|rg)
         if [ "$#" -eq 1 ]; then
             python3 bin/render_graphics.py 0 0x20000 output/graphics.png
         elif [[ "$2" == --* ]]; then
@@ -76,6 +77,10 @@ case "$1" in
         else
             python3 bin/render_graphics.py "${@:2}"
         fi
+        ;;
+
+    render-text)
+        python3 bin/render_text.py "${@:2}"
         ;;
 
     swap-character-sprite)

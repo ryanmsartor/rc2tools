@@ -34,6 +34,15 @@ def yellow_count(colors):
     )
 
 
+def green_count(colors):
+    """Count pixels from a {color: count} mapping that use a greenscale shade."""
+    return sum(
+        count
+        for color, count in colors.items()
+        if color in render_graphics.GREENSCALE_PALETTE
+    )
+
+
 def color_counts(image):
     return {color: count for count, color in image.getcolors(image.width * image.height)}
 
@@ -157,6 +166,44 @@ class RenderGraphicsTests(unittest.TestCase):
         }
         self.assertEqual(blue_count(front_colors), 16)
         self.assertEqual(blue_count(back_colors), 40)
+
+    def test_known_kind_covers_chest_through_npc_block(self):
+        self.assertEqual(render_graphics.known_kind(0x1811E), "graphics")
+        self.assertEqual(render_graphics.known_kind(0x1861D), "graphics")
+        self.assertIsNone(render_graphics.known_kind(0x1811D))
+        self.assertEqual(render_graphics.known_kind(0x1861E), "graphics")
+        self.assertEqual(render_graphics.known_kind(0x18A1D), "graphics")
+        self.assertEqual(render_graphics.known_kind(0x18A1E), "graphics")
+        self.assertEqual(render_graphics.known_kind(0x1A6AD), "graphics")
+        self.assertEqual(render_graphics.known_kind(0x17185), "graphics")
+        self.assertEqual(render_graphics.known_kind(0x17724), "graphics")
+        self.assertIsNone(render_graphics.known_kind(0x17725))
+        self.assertIsNone(render_graphics.known_kind(0x1B0FE))
+        self.assertEqual(render_graphics.known_kind(0x17165), "lookup")
+        self.assertEqual(render_graphics.known_kind(0x17184), "lookup")
+        self.assertIsNone(render_graphics.known_kind(0x15448))
+        self.assertEqual(render_graphics.known_kind(0x15449), "lookup")
+        self.assertEqual(render_graphics.known_kind(0x15D07), "lookup")
+        self.assertIsNone(render_graphics.known_kind(0x15D08))
+        self.assertIsNone(render_graphics.known_kind(0x17064))
+        self.assertEqual(render_graphics.known_kind(0x17065), "lookup")
+        self.assertEqual(render_graphics.known_kind(0x17164), "lookup")
+
+    def test_lookup_tables_shade_in_green(self):
+        tile = bytes([0xFF] * render_graphics.TILE_BYTES)
+        lookup = render_graphics.render_tile_grid(
+            tile, 1, 1, columns=1, scale=1, start_address=0x17165, highlight_known=True
+        )
+        lookup_colors = color_counts(lookup)
+        self.assertEqual(green_count(lookup_colors), 64)
+        self.assertEqual(blue_count(lookup_colors), 0)
+        self.assertEqual(yellow_count(lookup_colors), 0)
+        # 0x17185 starts the map-screen graphics, which stay blue.
+        graphics = render_graphics.render_tile_grid(
+            tile, 1, 1, columns=1, scale=1, start_address=0x17185, highlight_known=True
+        )
+        self.assertEqual(green_count(color_counts(graphics)), 0)
+        self.assertEqual(blue_count(color_counts(graphics)), 64)
 
     def test_highlights_graphics_through_bc85_but_not_bc86(self):
         first_glyph = render_graphics.render_tile_grid(
@@ -314,6 +361,18 @@ class RenderGraphicsTests(unittest.TestCase):
         )
         self.assertEqual(yellow_count(color_counts(image)), 16)
         self.assertEqual(blue_count(color_counts(image)), 0)
+
+    def test_dialogue_ranges_shade_in_yellow_up_to_their_end(self):
+        tile = bytes([0xFF] * render_graphics.TILE_BYTES)
+        inside = render_graphics.render_tile_grid(
+            tile, 1, 1, columns=1, scale=1, start_address=0x1C0C0, highlight_known=True
+        )
+        # 0x1C0F5-0x1C10B is a 23-byte control gap, so this whole tile is outside every text run.
+        after = render_graphics.render_tile_grid(
+            tile, 1, 1, columns=1, scale=1, start_address=0x1C0F5, highlight_known=True
+        )
+        self.assertEqual(yellow_count(color_counts(inside)), 64)
+        self.assertEqual(yellow_count(color_counts(after)), 0)
 
     def test_mixed_planes_use_the_plane_that_owns_each_pixel(self):
         # Low byte is graphics, high byte is text: pixels from each plane take that shade.

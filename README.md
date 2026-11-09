@@ -71,8 +71,8 @@ assembled sprites, pass the range and output path:
 ./rc2t render-graphics 0x9106 0xB566 output/hero-sprites.png
 ```
 
-Pass `--highlight-known` to shade documented graphics in blue and documented text
-in yellow, making unmapped tiles easier to spot. Known pixels keep their relative
+Pass `--highlight-known` to shade documented graphics in blue, documented text
+in yellow, and documented lookup or stat tables in green, making unmapped tiles easier to spot. Known pixels keep their relative
 brightness, so dark, mid, and light pixels stay distinguishable:
 
 ```sh
@@ -80,11 +80,18 @@ brightness, so dark, mid, and light pixels stay distinguishable:
 ./rc2t render-graphics 0x9100 0x9200 output/scan.png --highlight-known
 ```
 
+Decode the whole ROM through the documented character table into one string (`output/rom-text.txt`):
+
+```sh
+./rc2t render-text
+```
+
 The highlighted physical-ROM ranges follow the graphics and text documented in
-[the ROM map](./docs/rom-map.md). Highlighting follows the known byte ranges,
+[the ROM map](./docs/rom-map.md) and [the known-text list](./docs/known-text.md). Highlighting follows the known byte ranges,
 even when a range starts or ends inside a rendered tile. A pixel is blue when
-its color data comes only from bytes inside a known graphics range, and yellow
-when it comes only from a known text range. If only one of a tile row's two
+its color data comes only from bytes inside a known graphics range, yellow
+when it comes only from a known text range, and green when it comes only from a
+known lookup-table range. If only one of a tile row's two
 bitplane bytes is known, only pixels attributable to that byte are shaded.
 Portrait, sprite, and custom tile-grid layouts all use the same ranges.
 
