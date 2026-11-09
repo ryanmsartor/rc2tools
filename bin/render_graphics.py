@@ -25,7 +25,7 @@ PORTRAIT_WIDTH = PORTRAIT_TILE_COLUMNS * TILE_WIDTH
 KNOWN_GRAPHICS_RANGES = (
     (0x5291, 0x5580),
     (0x804E, 0x900E),
-    (0x9106, 0xB886),
+    (0x9106, 0xBB06),
 )
 DEFAULT_ROM = Path(__file__).resolve().parent.parent / "input" / "Rolan's Curse II (USA).gb"
 DEFAULT_PALETTE = (
@@ -308,6 +308,79 @@ def render_portraits(
     )
 
 
+def render_stacked_glyphs(
+    data: bytes,
+    columns: int = 16,
+    scale: int = 4,
+    palette: tuple[tuple[int, int, int], ...] = DEFAULT_PALETTE,
+    start_address: int | None = None,
+    highlight_known: bool = False,
+) -> Image.Image:
+    """Render each 16-byte tile as two stacked 8x8 1bpp glyphs (bit 0 is ink)."""
+    if columns < 1:
+        raise ValueError("columns must be at least 1")
+    if scale < 1:
+        raise ValueError("scale must be at least 1")
+    if len(palette) != 4:
+        raise ValueError("palette must contain exactly four colors")
+    if highlight_known and start_address is None:
+        raise ValueError("start address is required to highlight known graphics")
+
+    tile_count = math.ceil(len(data) / TILE_BYTES)
+    cell_height = TILE_BYTES
+    rows = math.ceil(tile_count / columns)
+    width = columns * TILE_WIDTH + (columns - 1) * SPRITE_GUTTER
+    height = rows * cell_height + (rows - 1) * SPRITE_GUTTER
+    image = Image.new("RGB", (width, height), palette[3])
+    draw = ImageDraw.Draw(image)
+    for column in range(1, columns):
+        x = column * (TILE_WIDTH + SPRITE_GUTTER) - SPRITE_GUTTER
+        draw.line((x, 0, x, height - 1), fill=GUTTER_COLOR)
+    for row in range(1, rows):
+        y = row * (cell_height + SPRITE_GUTTER) - SPRITE_GUTTER
+        draw.line((0, y, width - 1, y), fill=GUTTER_COLOR)
+
+    pixels = image.load()
+    for tile_index in range(tile_count):
+        tile_x = (tile_index % columns) * (TILE_WIDTH + SPRITE_GUTTER)
+        tile_y = (tile_index // columns) * (cell_height + SPRITE_GUTTER)
+        # Pad a short final tile with blank rows so it renders like the others.
+        tile_data = data[tile_index * TILE_BYTES:(tile_index + 1) * TILE_BYTES].ljust(
+            TILE_BYTES, b"\xff"
+        )
+        for y, row_byte in enumerate(tile_data):
+            row_address = (
+                start_address + tile_index * TILE_BYTES + y if start_address is not None else None
+            )
+            row_known = highlight_known and any(
+                known_start <= row_address < known_end
+                for known_start, known_end in KNOWN_GRAPHICS_RANGES
+            )
+            for x in range(TILE_WIDTH):
+                if row_known:
+                    color = HIGHLIGHT_COLOR
+                elif row_byte & (1 << (7 - x)):
+                    color = palette[3]
+                else:
+                    color = palette[0]
+                pixels[tile_x + x, tile_y + y] = color
+
+    if scale > 1:
+        image = image.resize((image.width * scale, image.height * scale), Image.Resampling.NEAREST)
+    if start_address is not None:
+        image = add_address_axes(
+            image,
+            tile_count,
+            columns,
+            start_address,
+            scale,
+            image_width=TILE_WIDTH,
+            image_height=cell_height,
+            bytes_per_image=TILE_BYTES,
+        )
+    return image
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("start", type=parse_offset, help="start ROM offset (inclusive)")
@@ -337,6 +410,11 @@ def main() -> int:
         help="paint tiles overlapping documented sprite areas solid blue",
     )
     parser.add_argument(
+        "--stacked-glyphs",
+        action="store_true",
+        help="render each 16-byte tile as two stacked 8x8 1bpp glyphs (bit 0 is ink)",
+    )
+    parser.add_argument(
         "--columns",
         type=int,
         default=None,
@@ -355,7 +433,18 @@ def main() -> int:
         if args.end > len(rom):
             raise ValueError(f"range end 0x{args.end:X} exceeds ROM size 0x{len(rom):X}")
         data = rom[args.start:args.end]
-        if args.tile_grid is not None:
+        if args.stacked_glyphs:
+            if args.tile_grid is not None or args.mode != "sprites":
+                raise ValueError("--stacked-glyphs cannot be combined with --tile-grid or --mode")
+            columns = args.columns if args.columns is not None else 16
+            image = render_stacked_glyphs(
+                data,
+                columns,
+                args.scale,
+                start_address=args.start,
+                highlight_known=args.highlight_known,
+            )
+        elif args.tile_grid is not None:
             tile_columns, tile_rows = args.tile_grid
             columns = args.columns if args.columns is not None else 4
             palette = PORTRAIT_PALETTE if args.mode == "portraits" else DEFAULT_PALETTE

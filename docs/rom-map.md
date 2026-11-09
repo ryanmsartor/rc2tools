@@ -471,6 +471,56 @@ The eight tiles from `0xB806` through `0xB885` continue the single-tile UI graph
 
 This ends the documented run of single-tile graphics at `0xB886`; larger sprite graphics follow.
 
+### Stockable item sprites
+
+Four stockable items follow at `0xB886`. Each sprite is 2×2 tiles (64 bytes), and the four sprites are stored consecutively:
+
+| Physical ROM range | Contents |
+|---|---|
+| `0xB886-0xB8C5` | Large potion |
+| `0xB8C6-0xB905` | Teardrop |
+| `0xB906-0xB945` | Crystal ball |
+| `0xB946-0xB985` | Angel's wing |
+
+Together these occupy `0xB886-0xB985` inclusive and exactly match the separately listed descriptor source range `0xB886-0xB985` below.
+
+### Stacked 1bpp glyph tiles
+
+The 24 tiles at `0xB986-0xBB05` are not sprites. Each 16-byte tile holds two 8×8 monochrome glyphs stacked vertically: the first 8 bytes are the top glyph and the last 8 bytes are the bottom glyph. Each byte is one row, with bit 7 at the left. A set bit is background and a clear bit is ink. Row 8 of each glyph is usually `0xFF` (blank), which gives spacing between the stacked glyphs.
+
+Read as 2bpp tiles, these bytes look like noise. Read as this 1bpp layout, the glyphs are clear, and `./rc2t render-graphics 0xB986 0xBB06 output/glyphs.png --stacked-glyphs` renders them in black. Each 16-byte tile is drawn as one 8×16 cell, which matches the in-game look of solid black characters at double height.
+
+Whether the game's loader uses this exact layout is not yet verified; it is the layout that renders as legible glyphs.
+
+| Tile range | Top glyph bytes | Top | Bottom glyph bytes | Bottom |
+|---|---|---|---|---|
+| `0xB986-0xB995` | `0xB986-0xB98D` | 0 | `0xB98E-0xB995` | 1 |
+| `0xB996-0xB9A5` | `0xB996-0xB99D` | 2 | `0xB99E-0xB9A5` | 3 |
+| `0xB9A6-0xB9B5` | `0xB9A6-0xB9AD` | 4 | `0xB9AE-0xB9B5` | 5 |
+| `0xB9B6-0xB9C5` | `0xB9B6-0xB9BD` | 6 | `0xB9BE-0xB9C5` | 7 |
+| `0xB9C6-0xB9D5` | `0xB9C6-0xB9CD` | 8 | `0xB9CE-0xB9D5` | 9 |
+| `0xB9D6-0xB9E5` | `0xB9D6-0xB9DD` | A | `0xB9DE-0xB9E5` | B |
+| `0xB9E6-0xB9F5` | `0xB9E6-0xB9ED` | C | `0xB9EE-0xB9F5` | D |
+| `0xB9F6-0xBA05` | `0xB9F6-0xB9FD` | E | `0xB9FE-0xBA05` | F |
+| `0xBA06-0xBA15` | `0xBA06-0xBA0D` | G | `0xBA0E-0xBA15` | H |
+| `0xBA16-0xBA25` | `0xBA16-0xBA1D` | I | `0xBA1E-0xBA25` | J |
+| `0xBA26-0xBA35` | `0xBA26-0xBA2D` | K | `0xBA2E-0xBA35` | L |
+| `0xBA36-0xBA45` | `0xBA36-0xBA3D` | M | `0xBA3E-0xBA45` | N |
+| `0xBA46-0xBA55` | `0xBA46-0xBA4D` | O | `0xBA4E-0xBA55` | P |
+| `0xBA56-0xBA65` | `0xBA56-0xBA5D` | Q | `0xBA5E-0xBA65` | R |
+| `0xBA66-0xBA75` | `0xBA66-0xBA6D` | S | `0xBA6E-0xBA75` | T |
+| `0xBA76-0xBA85` | `0xBA76-0xBA7D` | U | `0xBA7E-0xBA85` | V |
+| `0xBA86-0xBA95` | `0xBA86-0xBA8D` | W | `0xBA8E-0xBA95` | X |
+| `0xBA96-0xBAA5` | `0xBA96-0xBA9D` | Y | `0xBA9E-0xBAA5` | Z |
+| `0xBAA6-0xBAB5` | `0xBAA6-0xBAAD` | `'` (apostrophe) | `0xBAAE-0xBAB5` | `:` |
+| `0xBAB6-0xBAC5` | `0xBAB6-0xBABD` | `-` | `0xBABE-0xBAC5` | `.` |
+| `0xBAC6-0xBAD5` | `0xBAC6-0xBACD` | `,` | `0xBACE-0xBAD5` | `?` |
+| `0xBAD6-0xBAE5` | `0xBAD6-0xBADD` | `!` | `0xBADE-0xBAE5` | `-` (short) |
+| `0xBAE6-0xBAF5` | `0xBAE6-0xBAED` | `/` | `0xBAEE-0xBAF5` | `)` (thick) |
+| `0xBAF6-0xBB05` | `0xBAF6-0xBAFD` | `)` | `0xBAFE-0xBB05` | `(` |
+
+The two final parenthesis tiles may be used to indicate a highlight or something else - I (Ryan) don't recall ever seeing them used in game. The stacking itself is clear, but the characters' usage in the game's text has not been traced.
+
 ### Main bank-2 tile-data batch
 
 A sequence of eight 8-byte records at `0x9024-0x9063` appears to contain a length, a bank-2 CPU source address, a VRAM destination (`0x8000` in each record), and two zero bytes. Interpreting those fields this way yields eight contiguous source ranges:
@@ -502,7 +552,7 @@ The 6-byte records at `0x9064-0x90B1` appear to encode a byte length, bank-2 CPU
 
 This puts related referenced data as far as `0xBB05`; it is not evidence that all graphics in the game end there. Additional zero-terminated 6-byte-record lists occur at `0x90B4-0x90E3` and `0x90E6-0x9103`. They reuse source pointers from the ranges above and the main batch. Some 16-bit first fields in these lists have their high bit set (for example, `0x8180` and `0x80A0`), so the simple length interpretation may not apply to every record. The record layouts, flags, and actual loader behavior remain unverified.
 
-The `./rc2t render-graphics` command groups every four consecutive tiles in a supplied range into a 16×16 image, using the observed column-first order (top-left, bottom-left, top-right, bottom-right). For example, `./rc2t render-graphics 0x9106 0xB566 output/graphics.png` renders the main batch as an experimental sprite sheet. This uniform grouping is intended to help spot other sprites; it does not reconstruct the game's actual sprite/tile maps or palettes. An incomplete final group is padded with blank quadrants.
+The `./rc2t render-graphics` command groups every four consecutive tiles in a supplied range into a 16×16 image, using the observed column-first order (top-left, bottom-left, top-right, bottom-right). For example, `./rc2t render-graphics 0x9106 0xB566 output/graphics.png` renders the main batch as an experimental sprite sheet. This uniform grouping is intended to help spot other sprites; it does not reconstruct the game's actual sprite/tile maps or palettes. An incomplete final group is padded with blank quadrants. Add `--stacked-glyphs` to decode each 16-byte tile as two stacked 1bpp glyphs instead, as described above.
 
 ## Character stat and ability tables
 

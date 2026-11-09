@@ -114,6 +114,16 @@ Portrait mode uses four images per row by default and labels each portrait with
 its starting ROM offset. The range must contain a whole number of portraits;
 the command above writes to `output/graphics.png`.
 
+Use `--stacked-glyphs` for the stacked 1bpp character tiles documented at
+`0xB986-0xBB05`. Each 16-byte tile is drawn as two 8×8 glyphs, top then bottom,
+with set bits as background and clear bits as black ink:
+
+```sh
+./rc2t render-graphics 0xB986 0xBB06 output/glyphs.png --stacked-glyphs
+```
+
+Stacked-glyph mode cannot be combined with `--tile-grid` or `--mode`.
+
 The default sprite sheet uses 16 sprites per row. Its grayscale palette
 displays transparent color index 0 as black, while the inverted
 non-transparent palette displays index 3 as white. Portrait mode uses the

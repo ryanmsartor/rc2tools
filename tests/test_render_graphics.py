@@ -136,7 +136,7 @@ class RenderGraphicsTests(unittest.TestCase):
         self.assertEqual(front_colors[render_graphics.HIGHLIGHT_COLOR], 16)
         self.assertEqual(back_colors[render_graphics.HIGHLIGHT_COLOR], 40)
 
-    def test_highlights_graphics_through_b885_but_not_b886(self):
+    def test_highlights_graphics_through_bb05_but_not_bb06(self):
         first_glyph = render_graphics.render_tile_grid(
             bytes(render_graphics.TILE_BYTES),
             1,
@@ -164,13 +164,31 @@ class RenderGraphicsTests(unittest.TestCase):
             start_address=0xB806,
             highlight_known=True,
         )
+        first_item_tile = render_graphics.render_tile_grid(
+            bytes(render_graphics.TILE_BYTES),
+            1,
+            1,
+            columns=1,
+            scale=1,
+            start_address=0xB886,
+            highlight_known=True,
+        )
         boundary_tile = render_graphics.render_tile_grid(
             bytes([0xFF]) * render_graphics.TILE_BYTES,
             1,
             1,
             columns=1,
             scale=1,
-            start_address=0xB87E,
+            start_address=0xBAF6,
+            highlight_known=True,
+        )
+        after_range_tile = render_graphics.render_tile_grid(
+            bytes([0xFF]) * render_graphics.TILE_BYTES,
+            1,
+            1,
+            columns=1,
+            scale=1,
+            start_address=0xBB06,
             highlight_known=True,
         )
         first_colors = {
@@ -198,9 +216,43 @@ class RenderGraphicsTests(unittest.TestCase):
             )
         }
         self.assertEqual(first_frame_colors[render_graphics.HIGHLIGHT_COLOR], 64)
-        self.assertEqual(boundary_colors[render_graphics.HIGHLIGHT_COLOR], 32)
+        first_item_colors = {
+            color: count
+            for count, color in first_item_tile.getcolors(
+                first_item_tile.width * first_item_tile.height
+            )
+        }
+        self.assertEqual(first_item_colors[render_graphics.HIGHLIGHT_COLOR], 64)
+        self.assertEqual(boundary_colors[render_graphics.HIGHLIGHT_COLOR], 64)
+        after_range_colors = {
+            color: count
+            for count, color in after_range_tile.getcolors(
+                after_range_tile.width * after_range_tile.height
+            )
+        }
+        self.assertNotIn(render_graphics.HIGHLIGHT_COLOR, after_range_colors)
 
-    def test_highlighting_requires_a_start_address(self):
+    def test_stacked_glyphs_render_each_half_as_one_glyph(self):
+        # Bit 0 is ink, so 0x00 is solid black and 0xFF is blank.
+        tile = bytes([0x00] * 8 + [0xFF] * 8)
+        image = render_graphics.render_stacked_glyphs(tile, columns=1, scale=1)
+        self.assertEqual(image.size, (render_graphics.TILE_WIDTH, render_graphics.TILE_BYTES))
+        colors = {color: count for count, color in image.getcolors(image.width * image.height)}
+        self.assertEqual(colors[render_graphics.DEFAULT_PALETTE[0]], 64)
+        self.assertEqual(colors[render_graphics.DEFAULT_PALETTE[3]], 64)
+        self.assertEqual(image.getpixel((0, 0)), render_graphics.DEFAULT_PALETTE[0])
+        self.assertEqual(image.getpixel((0, 8)), render_graphics.DEFAULT_PALETTE[3])
+
+    def test_stacked_glyphs_highlight_only_known_rows(self):
+        tile = bytes([0xFF] * render_graphics.TILE_BYTES)
+        image = render_graphics.render_stacked_glyphs(
+            tile, columns=1, scale=1, start_address=0xBB00, highlight_known=True
+        )
+        colors = {color: count for count, color in image.getcolors(image.width * image.height)}
+        # Rows at 0xBB00-0xBB05 are inside the known range; 0xBB06-0xBB0F are not.
+        self.assertEqual(colors[render_graphics.HIGHLIGHT_COLOR], 48)
+
+
         with self.assertRaisesRegex(ValueError, "start address is required"):
             render_graphics.render_tile_grid(
                 bytes(render_graphics.TILE_BYTES),
