@@ -14,7 +14,9 @@ class DecompileWrapperTests(unittest.TestCase):
         self.root = Path(self.temporary.name)
         (self.root / "bin").mkdir()
         shutil.copy2(ROOT / "rc2t", self.root / "rc2t")
-        shutil.copy2(ROOT / "bin" / "decompile_rom.py", self.root / "bin" / "decompile_rom.py")
+        for name in ("decompile_rom.py", "sprite_annotations.py", "rom_annotations.py",
+                     "dump_text.py", "render_text.py", "extract_json.py"):
+            shutil.copy2(ROOT / "bin" / name, self.root / "bin" / name)
         rom = self.root / "game.gb"
         rom.write_bytes(bytes([0x00, 0x18, 0xFD]))
         self.rom = rom

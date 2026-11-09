@@ -48,6 +48,16 @@ high-level source; use `--start` and `--end` to focus on known code ranges.
 Illegal CPU opcodes are emitted as `DB` directives. The `disassemble` command
 is an alias for `decompile`.
 
+For ROMs matching the size, title, and cartridge header of Rolan's Curse II
+(USA), the listing also comments documented sprites, graphics, text, tables,
+header fields and code landmarks from [the ROM map](docs/rom-map.md) and
+[known text](docs/known-text.md). Ranges are physical offsets with exclusive
+ends; one-byte code landmarks identify a location, not the extent of a routine.
+Inferred or tentative identifications are marked. These checks do not
+verify the ROM hash, so modified ROMs or other revisions may not match the
+documented layout. Comments mark blocks that begin inside an instruction or
+continue into a selected range without changing the linear disassembly.
+
 ### Recompile an assembly listing
 
 The recompiler uses Python 3.10 or later and requires no external assembler.

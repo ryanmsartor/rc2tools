@@ -2,14 +2,19 @@ import importlib.util
 import os
 import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-SPEC = importlib.util.spec_from_file_location("decompile_rom", ROOT / "bin" / "decompile_rom.py")
-decompile_rom = importlib.util.module_from_spec(SPEC)
-SPEC.loader.exec_module(decompile_rom)
+sys.path.insert(0, str(ROOT / "bin"))
+try:
+    SPEC = importlib.util.spec_from_file_location("decompile_rom", ROOT / "bin" / "decompile_rom.py")
+    decompile_rom = importlib.util.module_from_spec(SPEC)
+    SPEC.loader.exec_module(decompile_rom)
+finally:
+    sys.path.pop(0)
 
 
 class RecompileWrapperTests(unittest.TestCase):
@@ -20,7 +25,8 @@ class RecompileWrapperTests(unittest.TestCase):
         (self.root / "bin").mkdir()
         (self.root / "input").mkdir()
         shutil.copy2(ROOT / "rc2t", self.root / "rc2t")
-        for name in ("decompile_rom.py", "recompile_rom.py"):
+        for name in ("decompile_rom.py", "recompile_rom.py", "sprite_annotations.py",
+                     "rom_annotations.py", "dump_text.py", "render_text.py", "extract_json.py"):
             shutil.copy2(ROOT / "bin" / name, self.root / "bin" / name)
 
     def run_wrapper(self, command, *args, env=None):
@@ -124,6 +130,13 @@ class RecompileWrapperTests(unittest.TestCase):
         source = self.root / "input" / "game.asm"
         result = self.run_wrapper("decompile", str(rom), str(source))
         self.assertEqual(result.returncode, 0, result.stderr)
+        listing = source.read_text(encoding="utf-8")
+        self.assertIn("; Sprite: Hero idling down", listing)
+        self.assertIn("; Sprite: Boss sprites (tentative", listing)
+        self.assertIn("; Text: Dialogue or story text candidate", listing)
+        self.assertIn("; Table: Hero HP by level", listing)
+        self.assertIn("; Graphics: Stacked 1bpp glyphs:", listing)
+        self.assertIn("; Code: Startup entry", listing)
         result = self.run_wrapper("recompile", source.name)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual((self.root / "output" / "game (recompiled).gb").read_bytes(), rom.read_bytes())

@@ -1,15 +1,136 @@
 import importlib.util
+import re
+import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parent.parent
-SPEC = importlib.util.spec_from_file_location("decompile_rom", ROOT / "bin" / "decompile_rom.py")
-decompile_rom = importlib.util.module_from_spec(SPEC)
-SPEC.loader.exec_module(decompile_rom)
+sys.path.insert(0, str(ROOT / "bin"))
+try:
+    SPEC = importlib.util.spec_from_file_location("decompile_rom", ROOT / "bin" / "decompile_rom.py")
+    decompile_rom = importlib.util.module_from_spec(SPEC)
+    SPEC.loader.exec_module(decompile_rom)
+finally:
+    sys.path.pop(0)
 
 
 class DecompileRomTests(unittest.TestCase):
+    @staticmethod
+    def target_rom():
+        rom = bytearray(0x20000)
+        rom[0x134:0x143] = b"ROLAN'S CURSE 2"
+        rom[0x147:0x149] = b"\x06\x02"
+        return rom
+
+    def test_sprite_registry_matches_documented_character_and_item_ranges(self):
+        documentation = (ROOT / "docs" / "rom-map.md").read_text(encoding="utf-8")
+        blocks = {(start, end) for start, end, _ in decompile_rom.SPRITE_BLOCKS}
+        for heading, next_heading in (
+            ("### Hero animation, weapon, and spell sprites", "### Numeric and HUD glyph tiles"),
+            ("### Stockable item sprites", "### Stacked 1bpp glyph tiles"),
+            ("### Healing item and energy sprites", "### Ending credits text"),
+        ):
+            section = documentation.split(heading, 1)[1].split(next_heading, 1)[0]
+            ranges = re.findall(r"^\| `0x([0-9A-F]+)-0x([0-9A-F]+)` \|", section, re.M)
+            self.assertTrue(ranges)
+            for first, last in ranges:
+                with self.subTest(first=first, last=last):
+                    self.assertIn((int(first, 16), int(last, 16) + 1), blocks)
+
+    def test_all_sprite_blocks_are_annotated_at_their_boundaries(self):
+        rom = self.target_rom()
+        for start, end, label in decompile_rom.SPRITE_BLOCKS:
+            with self.subTest(start=start, label=label):
+                self.assertLess(start, end)
+                listing = decompile_rom.disassemble(rom, start, start + 1)
+                self.assertIn(f"; Sprite: {label} [0x{start:06X}, 0x{end:06X})", listing)
+                listing = decompile_rom.disassemble(rom, end - 1, end)
+                self.assertIn(f"; Sprite: {label} [0x{start:06X}, 0x{end:06X})", listing)
+                self.assertIn("continued from before selected range", listing)
+
+    def test_sprite_annotations_require_matching_header_and_size(self):
+        rom = self.target_rom()
+        self.assertIn("Hero UI icon: sword", decompile_rom.disassemble(rom, 0x804E, 0x804F))
+        for offset in (0x134, 0x147, 0x148):
+            modified = rom.copy()
+            modified[offset] ^= 1
+            with self.subTest(offset=offset):
+                self.assertNotIn("; Sprite:", decompile_rom.disassemble(modified, 0x804E, 0x804F))
+        self.assertNotIn("; Sprite:", decompile_rom.disassemble(rom[:-1], 0x804E, 0x804F))
+
+    def test_sprite_boundary_inside_instruction_and_partial_range(self):
+        rom = self.target_rom()
+        rom[0x808D:0x8090] = b"\xc3\x00\x00"
+        listing = decompile_rom.disassemble(rom, 0x808D, 0x8090)
+        self.assertIn("Hero UI icon: sword", listing)
+        self.assertIn("continued from before selected range", listing)
+        self.assertIn("Hero UI icon: magic ball [0x00808E, 0x0080CE); starts within instruction at 0x00808D", listing)
+        self.assertIn("; 00808D: C3 00 00\n    JP $0000", listing)
+        self.assertNotIn("Hero UI icon: magic ball", decompile_rom.disassemble(rom, 0x808C, 0x808E))
+        self.assertNotIn("Hero UI icon: sword", decompile_rom.disassemble(rom, 0x808E, 0x808F))
+
+    def test_overlapping_blocks_and_bank_boundaries(self):
+        rom = self.target_rom()
+        blocks = ((0x3FFE, 0x4002, "first"), (0x3FFF, 0x4001, "second"))
+        with patch.object(decompile_rom, "SPRITE_BLOCKS", blocks):
+            listing = decompile_rom.disassemble(rom, 0x3FFF, 0x4002)
+        self.assertEqual(listing.count("; Sprite: first"), 1)
+        self.assertEqual(listing.count("; Sprite: second"), 1)
+        self.assertIn('SECTION "ROM bank 01", ROMX[$4000], BANK[1]', listing)
+
+    def test_all_other_annotations_are_emitted_and_exclusive(self):
+        rom = self.target_rom()
+        for start, end, category, label in decompile_rom.ROM_ANNOTATIONS:
+            with self.subTest(start=start, category=category, label=label):
+                self.assertLess(start, end)
+                expected = f"; {category}: {label} [0x{start:06X}, 0x{end:06X})"
+                self.assertIn(expected, decompile_rom.disassemble(rom, start, start + 1))
+                self.assertIn(expected, decompile_rom.disassemble(rom, end - 1, end))
+                if end < len(rom):
+                    self.assertNotIn(expected, decompile_rom.disassemble(rom, end, end + 1))
+
+    def test_additional_annotations_cover_documented_tables_and_text(self):
+        import dump_text
+        import extract_json
+
+        annotations = decompile_rom.ROM_ANNOTATIONS
+        text_ranges = {(start, end) for start, end, category, label in annotations
+                       if category == "Text" or label == "Unclassified control-byte fragment; not confirmed text"}
+        self.assertEqual(text_ranges, {dump_text.TITLE_RANGE, *dump_text.TEXT_RANGES})
+        table_ranges = {(start, end) for start, end, category, _ in annotations if category == "Table"}
+        for abilities in extract_json.ABILITIES.values():
+            for _, start, fields in abilities:
+                self.assertIn((start, start + extract_json.LEVELS * len(fields)), table_ranges)
+        for start, count, width in extract_json.ADDITIONAL_TABLES.values():
+            self.assertIn((start, start + count * width), table_ranges)
+        self.assertEqual(len([a for a in annotations if a[2] == "Table"]), 16 + 22 + 3)
+
+    def test_other_annotations_are_gated_and_overlap_sprite_blocks(self):
+        rom = self.target_rom()
+        listing = decompile_rom.disassemble(rom, 0xB886, 0xB887)
+        self.assertIn("; Sprite: Stockable large potion", listing)
+        self.assertIn("; Graphics: Presumed graphics descriptor source range", listing)
+        rom[0x147] = 0
+        self.assertNotIn("; Graphics:", decompile_rom.disassemble(rom, 0xB886, 0xB887))
+        self.assertNotIn("; Text:", decompile_rom.disassemble(rom, 0x1C0C0, 0x1C0C1))
+        self.assertNotIn("; Table:", decompile_rom.disassemble(rom, 0x15449, 0x1544A))
+
+    def test_documented_graphics_tiles_are_annotated(self):
+        documentation = (ROOT / "docs" / "rom-map.md").read_text(encoding="utf-8")
+        blocks = {(start, end) for start, end, category, _ in decompile_rom.ROM_ANNOTATIONS
+                  if category == "Graphics"}
+        section = documentation.split("### Numeric and HUD glyph tiles", 1)[1].split(
+            "### Stockable item sprites", 1)[0]
+        ranges = re.findall(r"^\| `0x([0-9A-F]+)-0x([0-9A-F]+)` \|", section, re.M)
+        self.assertEqual(len(ranges), 50)
+        for first, last in ranges:
+            with self.subTest(first=first):
+                self.assertIn((int(first, 16), int(last, 16) + 1), blocks)
+        self.assertEqual(len([a for a in decompile_rom.ROM_ANNOTATIONS
+                              if "Stacked 1bpp glyphs:" in a[3]]), 24)
+
     def test_decodes_immediates_and_relative_targets(self):
         cases = (
             (bytes([0x01, 0x34, 0x12]), 0x100, ("LD BC,$1234", 3)),
