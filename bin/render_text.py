@@ -15,8 +15,10 @@ CHARACTER_TABLE = {
     0x24: "'",
     0x27: ".",
     0x28: ",",
+    0x29: "?",
     0x2A: "!",
     0x2B: "-",
+    0x2D: ":",
     0xFD: "+",
     0xFF: "#",
     # Hero name placeholders render as the capital word HERO.

@@ -12,7 +12,7 @@ SPEC.loader.exec_module(render_text)
 class RenderTextTests(unittest.TestCase):
     def test_known_bytes_decode_to_their_glyphs(self):
         self.assertEqual(render_text.decode(bytes([0x0A, 0x23])), "az")
-        self.assertEqual(render_text.decode(bytes([0xB2, 0x24, 0x27, 0x28, 0xFD, 0xFF])), " '.,+#")
+        self.assertEqual(render_text.decode(bytes([0xB2, 0x24, 0x27, 0x28, 0x29, 0x2A, 0x2B, 0x2D, 0xFD, 0xFF])), " '.,?!-:+#")
 
     def test_hero_placeholders_render_as_capital_hero(self):
         self.assertEqual(render_text.decode(bytes([0xE0, 0xE1, 0xE2, 0xE3])), "HERO")
