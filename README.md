@@ -27,6 +27,54 @@ levels 1 through 16; the mappings and their unresolved interpretations are
 documented in [the ROM map](docs/rom-map.md). The output file is overwritten
 if a file with that ROM hash already exists.
 
+## Disassemble a Game Boy ROM
+
+Decode a ROM into an RGBDS-style assembly listing:
+
+```sh
+./rc2t decompile
+./rc2t decompile path/to/game.gb output/game.asm
+./rc2t decompile path/to/game.gb output/range.asm --start 0x100 --end 0x200
+```
+
+The listing defaults to `output/<rom-basename>.asm`. ROM bytes are decoded
+linearly as LR35902 instructions, with sections split at 16 KiB ROM-bank
+boundaries. Since a ROM contains both executable code and data, this simple
+disassembler cannot identify code/data boundaries or reconstruct the original
+high-level source; use `--start` and `--end` to focus on known code ranges.
+Illegal CPU opcodes are emitted as `DB` directives. The `disassemble` command
+is an alias for `decompile`.
+
+### Recompile an assembly listing
+
+The recompiler uses Python 3.10 or later and requires no external assembler.
+Copy or move the `.asm` file into `input/`, then run:
+
+```sh
+./rc2t recompile
+```
+
+By default this reads `input/Rolan's Curse II (USA).asm` and writes
+`output/Rolan's Curse II (USA) (recompiled).gb`. You can also supply another
+filename in `input/` or an explicit path to an `.asm` file:
+
+```sh
+./rc2t recompile "other game.asm"
+./rc2t recompile path/to/game.asm
+```
+
+The assembler uses the instructions and
+directives, not the byte comments, so edits to the source affect the ROM.
+It supports the LR35902 instructions, `DB` byte directives and fixed-address
+`ROM0`/`ROMX` sections emitted by the disassembler, with numeric operands.
+It is not a general RGBDS assembler: labels, macros, and other directives and
+expressions are not supported. Unsupported syntax and overlapping or
+out-of-bank sections produce errors. No header or checksum is automatically
+changed. Gaps and incomplete ROM banks are zero-padded, with a minimum output
+size of 32 KiB; listings made with `--start` or `--end` do not reconstruct the
+omitted bytes. Regenerate listings made by older versions of the disassembler
+before recompiling them.
+
 ## Render graphics as tile grids, sprites, and portraits
 
 Rendering requires Pillow 10.0 or later. Install it with:
