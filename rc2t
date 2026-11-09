@@ -18,7 +18,13 @@ rc2t_print_help_message() {
     echo "  dump-text [rom-or-hex [output]]  Dump documented text ranges into output/known-text.txt"
     echo "  decompile | disassemble [rom [output]] [--start OFFSET] [--end OFFSET]  Disassemble a Game Boy ROM"
     echo "  recompile [assembly-file]  Assemble an input/ .asm file into output/<basename> (recompiled).gb"
-    echo "  hack <subcommand>  Edit the working/ hack copy: clear | reset | finalize | swap-character-sprite <character1> <character2>"
+    echo "  hack <subcommand>  Edit the working/ hack copy:"
+    echo "    clear                             Delete the in-progress hack copy and hacks.txt"
+    echo "    reset                             Replace the in-progress hack copy with a fresh copy of input/"
+    echo "    finalize                          Copy the in-progress hack to output/ with an IPS patch"
+    echo "    swap-char-sprite <char1> <char2>  Swap two characters' sprites and POW portraits"
+    echo "    dump-art <name>                   Export named art (title) to working/<name>-art.png"
+    echo "    read-art <name>                   Apply working/<name>-art.png to the in-progress hack"
 }
 
 _check_if_rom_exists() {

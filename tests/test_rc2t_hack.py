@@ -4,6 +4,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from PIL import Image
+
 
 ROOT = Path(__file__).resolve().parent.parent
 ROM_NAME = "Rolan's Curse II (USA).gb"
@@ -27,7 +29,7 @@ class HackWrapperTests(unittest.TestCase):
         (self.root / "input").mkdir()
         (self.root / "output").mkdir()
         shutil.copy2(ROOT / "rc2t", self.root / "rc2t")
-        for name in ("hack_rom.py", "swap_character_sprite.py"):
+        for name in ("hack_rom.py", "swap_character_sprite.py", "art_layout.py"):
             shutil.copy2(ROOT / "bin" / name, self.root / "bin" / name)
         self.rom = bytes(range(256)) * 0x200
         (self.root / "input" / ROM_NAME).write_bytes(self.rom)
@@ -105,14 +107,14 @@ class HackWrapperTests(unittest.TestCase):
 
     def test_clear_deletes_hacks_log(self):
         self.run_wrapper("reset")
-        self.run_wrapper("swap-character-sprite", "hero", "pit")
+        self.run_wrapper("swap-char-sprite", "hero", "pit")
         result = self.run_wrapper("clear")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertFalse(self.hacks_log.exists())
 
     def test_reset_clears_hacks_log(self):
         self.run_wrapper("reset")
-        self.run_wrapper("swap-character-sprite", "hero", "pit")
+        self.run_wrapper("swap-char-sprite", "hero", "pit")
         result = self.run_wrapper("reset")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(self.hacks_log.read_text(), "")
@@ -121,7 +123,7 @@ class HackWrapperTests(unittest.TestCase):
         rom = self.build_sprite_rom()
         self.use_input_rom(rom)
         self.run_wrapper("reset")
-        result = self.run_wrapper("swap-character-sprite", "hero", "pit")
+        result = self.run_wrapper("swap-char-sprite", "hero", "pit")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(self.working.read_bytes(), self.expected_swapped(rom))
         self.assertEqual((self.root / "input" / ROM_NAME).read_bytes(), rom)
@@ -129,32 +131,54 @@ class HackWrapperTests(unittest.TestCase):
     def test_swap_writes_no_output_files(self):
         self.use_input_rom(self.build_sprite_rom())
         self.run_wrapper("reset")
-        self.run_wrapper("swap-character-sprite", "hero", "pit")
+        self.run_wrapper("swap-char-sprite", "hero", "pit")
         self.assertEqual(list((self.root / "output").iterdir()), [])
 
     def test_swap_appends_each_hack_to_hacks_log(self):
         self.use_input_rom(self.build_sprite_rom())
         self.run_wrapper("reset")
-        self.run_wrapper("swap-character-sprite", "hero", "pit")
-        result = self.run_wrapper("swap-character-sprite", "lane", "kyle")
+        self.run_wrapper("swap-char-sprite", "hero", "pit")
+        result = self.run_wrapper("swap-char-sprite", "lane", "kyle")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(
             self.hacks_log.read_text(),
-            "swap-character-sprite hero pit\nswap-character-sprite lane kyle\n",
+            "swap-char-sprite hero pit\nswap-char-sprite lane kyle\n",
         )
 
     def test_swap_accepts_mixed_case_names(self):
         self.use_input_rom(self.build_sprite_rom())
         self.run_wrapper("reset")
-        result = self.run_wrapper("swap-character-sprite", "HERO", "Pit")
+        result = self.run_wrapper("swap-char-sprite", "HERO", "Pit")
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(self.hacks_log.read_text(), "swap-character-sprite hero pit\n")
+        self.assertEqual(self.hacks_log.read_text(), "swap-char-sprite hero pit\n")
+
+    def test_old_swap_name_is_an_alias_logged_under_new_name(self):
+        rom = self.build_sprite_rom()
+        self.use_input_rom(rom)
+        self.run_wrapper("reset")
+        result = self.run_wrapper("swap-character-sprite", "hero", "pit")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self.working.read_bytes(), self.expected_swapped(rom))
+        self.assertEqual(self.hacks_log.read_text(), "swap-char-sprite hero pit\n")
+
+    def test_old_swap_name_rejects_identical_characters(self):
+        self.run_wrapper("reset")
+        result = self.run_wrapper("swap-character-sprite", "hero", "hero")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("must be different", result.stderr)
+        self.assertEqual(self.hacks_log.read_text(), "")
+
+    def test_help_lists_swap_without_old_name(self):
+        result = self.run_wrapper("-h")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("swap-char-sprite", result.stdout)
+        self.assertNotIn("swap-character-sprite", result.stdout)
 
     def test_invalid_character_fails_without_changing_working_copy(self):
         self.use_input_rom(self.build_sprite_rom())
         self.run_wrapper("reset")
         before = self.working.read_bytes()
-        result = self.run_wrapper("swap-character-sprite", "hero", "unknown")
+        result = self.run_wrapper("swap-char-sprite", "hero", "unknown")
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("invalid choice", result.stderr)
         self.assertEqual(self.working.read_bytes(), before)
@@ -164,7 +188,7 @@ class HackWrapperTests(unittest.TestCase):
         self.use_input_rom(self.build_sprite_rom())
         self.run_wrapper("reset")
         before = self.working.read_bytes()
-        result = self.run_wrapper("swap-character-sprite", "hero", "hero")
+        result = self.run_wrapper("swap-char-sprite", "hero", "hero")
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("must be different", result.stderr)
         self.assertEqual(self.working.read_bytes(), before)
@@ -174,7 +198,7 @@ class HackWrapperTests(unittest.TestCase):
         self.use_input_rom(bytes(0x2000))
         self.run_wrapper("reset")
         before = self.working.read_bytes()
-        result = self.run_wrapper("swap-character-sprite", "hero", "pit")
+        result = self.run_wrapper("swap-char-sprite", "hero", "pit")
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("Error:", result.stderr)
         self.assertEqual(self.working.read_bytes(), before)
@@ -184,7 +208,7 @@ class HackWrapperTests(unittest.TestCase):
         rom = self.build_sprite_rom()
         self.use_input_rom(rom)
         self.run_wrapper("reset")
-        self.run_wrapper("swap-character-sprite", "hero", "pit")
+        self.run_wrapper("swap-char-sprite", "hero", "pit")
         result = self.run_wrapper("finalize")
         self.assertEqual(result.returncode, 0, result.stderr)
         output_rom = self.root / "output" / f"{FINALIZED_STEM}.gb"
@@ -201,6 +225,44 @@ class HackWrapperTests(unittest.TestCase):
         result = self.run_wrapper()
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("usage", result.stderr)
+
+    def test_dump_art_writes_title_png_without_logging(self):
+        self.use_input_rom(self.build_sprite_rom())
+        self.run_wrapper("reset")
+        result = self.run_wrapper("dump-art", "title")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        with Image.open(self.root / "working" / "title-art.png") as image:
+            self.assertEqual(image.size, (160, 104))
+        self.assertEqual(self.hacks_log.read_text(), "")
+
+    def test_read_art_applies_png_and_logs_hack(self):
+        rom = bytearray(self.build_sprite_rom())
+        self.use_input_rom(bytes(rom))
+        self.run_wrapper("reset")
+        self.run_wrapper("dump-art", "title")
+        png = self.root / "working" / "title-art.png"
+        with Image.open(png) as image:
+            edited = image.convert("L")
+        edited.putpixel((12 * 8, 1 * 8), 0)
+        edited.save(png)
+        result = self.run_wrapper("read-art", "title")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self.hacks_log.read_text(), "read-art title\n")
+        self.assertNotEqual(self.working.read_bytes(), bytes(rom))
+
+    def test_read_art_without_png_fails_and_leaves_rom_unchanged(self):
+        self.run_wrapper("reset")
+        before = self.working.read_bytes()
+        result = self.run_wrapper("read-art", "title")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Error:", result.stderr)
+        self.assertEqual(self.working.read_bytes(), before)
+        self.assertEqual(self.hacks_log.read_text(), "")
+
+    def test_art_subcommands_reject_unknown_name(self):
+        result = self.run_wrapper("dump-art", "logo")
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("invalid choice", result.stderr)
 
 
 if __name__ == "__main__":

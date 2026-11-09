@@ -235,15 +235,30 @@ that copy from `input/` first if it does not exist.
 ./rc2t hack reset     # delete the in-progress copy and replace it with a fresh copy of input/
 ./rc2t hack clear     # delete the in-progress copy
 ./rc2t hack finalize  # copy the in-progress copy to output/ and write an IPS patch
-./rc2t hack swap-character-sprite hero pit  # edit the in-progress copy in place
+./rc2t hack swap-char-sprite hero pit  # edit the in-progress copy in place
+./rc2t hack dump-art title   # write working/title-art.png from the in-progress copy
+./rc2t hack read-art title   # apply an edited working/title-art.png to the in-progress copy
 ```
 
-Character names for `swap-character-sprite` are `hero`, `pit`, `lane`, `kyle`,
+Character names for `swap-char-sprite` are `hero`, `pit`, `lane`, `kyle`,
 `jude`, `lee`, `lora`, and `zold`. The swap exchanges the nine standard poses,
 defeat sprite, level-up face, and POW-screen portrait of the two characters.
 
+`dump-art title` writes the title screen's logo above the START/CONTINUE line to
+`working/title-art.png`. The image is 160×104 pixels, the top 13 rows of the
+Game Boy screen, and the art is arranged as it appears on screen. The four
+shades are the title screen's palette (BGP `0x2D`): index 0 is light gray, 1 is
+black, 2 is dark gray, and 3 is white. The menu cursor, the START and CONTINUE
+text, and the copyright line are not part of the image.
+
+`read-art title` reads `working/title-art.png` and writes the tiles back into
+the in-progress copy. The image must be exactly 160×104 pixels. Each pixel is
+mapped to the nearest of the four shades. Some tiles appear in more than one
+cell, such as the blank filler tile `0x30`, so every cell that uses such a tile
+must have the same pixels. Otherwise `read-art` fails and changes nothing.
+
 Each applied hack is recorded in `working/hacks.txt`, one line per hack. `reset`
-and `clear` delete this file, and `swap-character-sprite` appends to it.
+and `clear` delete this file, and `swap-char-sprite` and `read-art` append to it.
 `finalize` does not copy it to `output/`.
 
 `finalize` writes `output/Rolan's Curse II (USA) (hack finalized).gb` and

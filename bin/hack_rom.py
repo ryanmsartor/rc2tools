@@ -6,6 +6,9 @@ import shutil
 import sys
 from pathlib import Path
 
+from PIL import Image
+
+from art_layout import ART_LAYOUTS, apply_art, render_art
 from swap_character_sprite import CHARACTER_SPRITES, swap_character_sprites
 
 
@@ -17,6 +20,8 @@ WORKING_ROM_PATH = WORKING_DIR / "Rolan's Curse II (USA) (hack in progress).gb"
 HACKS_LOG_PATH = WORKING_DIR / "hacks.txt"
 OUTPUT_DIR = ROOT / "output"
 FINALIZED_STEM = "Rolan's Curse II (USA) (hack finalized)"
+SWAP_SUBCOMMAND = "swap-char-sprite"
+SWAP_ALIAS = "swap-character-sprite"
 IPS_HEADER = b"PATCH"
 IPS_EOF = b"EOF"
 IPS_EOF_OFFSET = int.from_bytes(IPS_EOF, "big")
@@ -90,8 +95,29 @@ def apply_swap_character_sprite(character1: str, character2: str) -> None:
     rom = bytearray(WORKING_ROM_PATH.read_bytes())
     swap_character_sprites(rom, character1, character2)
     WORKING_ROM_PATH.write_bytes(rom)
-    record_hack(f"swap-character-sprite {character1} {character2}")
+    record_hack(f"{SWAP_SUBCOMMAND} {character1} {character2}")
     print(f"Swapped {character1} and {character2} sprites in {WORKING_ROM_PATH}")
+
+
+def art_png_path(name: str) -> Path:
+    return WORKING_DIR / f"{name}-art.png"
+
+
+def dump_art(name: str) -> None:
+    image = render_art(ART_LAYOUTS[name], WORKING_ROM_PATH.read_bytes())
+    path = art_png_path(name)
+    image.save(path)
+    print(f"Wrote {path}")
+
+
+def read_art(name: str) -> None:
+    rom = bytearray(WORKING_ROM_PATH.read_bytes())
+    path = art_png_path(name)
+    with Image.open(path) as image:
+        apply_art(ART_LAYOUTS[name], rom, image)
+    WORKING_ROM_PATH.write_bytes(rom)
+    record_hack(f"read-art {name}")
+    print(f"Applied {path} to {WORKING_ROM_PATH}")
 
 
 def finalize_working_copy() -> None:
@@ -108,6 +134,25 @@ def finalize_working_copy() -> None:
     print(f"Wrote {patch_output}")
 
 
+def _add_swap_arguments(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "character1",
+        type=str.lower,
+        choices=tuple(CHARACTER_SPRITES),
+        help="first character to swap",
+    )
+    parser.add_argument(
+        "character2",
+        type=str.lower,
+        choices=tuple(CHARACTER_SPRITES),
+        help="second character to swap",
+    )
+
+
+def _add_art_arguments(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("name", choices=tuple(ART_LAYOUTS), help="named art to use")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(prog="rc2t hack", description=__doc__)
     subparsers = parser.add_subparsers(dest="subcommand", required=True, metavar="<subcommand>")
@@ -118,23 +163,26 @@ def main() -> int:
         help="copy the in-progress hack into output/ and write an IPS patch against the input ROM",
     )
     swap_parser = subparsers.add_parser(
-        "swap-character-sprite",
+        SWAP_SUBCOMMAND,
         help="swap two characters' sprites and POW portraits in the in-progress hack copy",
     )
-    swap_parser.add_argument(
-        "character1",
-        type=str.lower,
-        choices=tuple(CHARACTER_SPRITES),
-        help="first character to swap",
+    _add_swap_arguments(swap_parser)
+    dump_parser = subparsers.add_parser(
+        "dump-art",
+        help="export named art from the in-progress hack to working/<name>-art.png",
     )
-    swap_parser.add_argument(
-        "character2",
-        type=str.lower,
-        choices=tuple(CHARACTER_SPRITES),
-        help="second character to swap",
+    _add_art_arguments(dump_parser)
+    read_parser = subparsers.add_parser(
+        "read-art",
+        help="apply working/<name>-art.png to the in-progress hack",
     )
-    args = parser.parse_args()
-    if args.subcommand == "swap-character-sprite" and args.character1 == args.character2:
+    _add_art_arguments(read_parser)
+    argv = sys.argv[1:]
+    # Accept the original command name without listing it in help.
+    if argv[:1] == [SWAP_ALIAS]:
+        argv[0] = SWAP_SUBCOMMAND
+    args = parser.parse_args(argv)
+    if args.subcommand == SWAP_SUBCOMMAND and args.character1 == args.character2:
         swap_parser.error("characters must be different")
 
     try:
@@ -145,8 +193,12 @@ def main() -> int:
             reset_working_copy()
         elif args.subcommand == "finalize":
             finalize_working_copy()
-        elif args.subcommand == "swap-character-sprite":
+        elif args.subcommand == SWAP_SUBCOMMAND:
             apply_swap_character_sprite(args.character1, args.character2)
+        elif args.subcommand == "dump-art":
+            dump_art(args.name)
+        elif args.subcommand == "read-art":
+            read_art(args.name)
     except (OSError, ValueError) as error:
         print(f"Error: {error}", file=sys.stderr)
         return 1

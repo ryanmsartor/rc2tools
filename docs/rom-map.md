@@ -97,7 +97,9 @@ A descriptor table at physical offset `0x18110` (CPU address `0x4110` with bank 
 | `0x0550` | `0x66AE` | `0x1A6AE-0x1ABFD` | `0x8800` |
 | `0x0500` | `0x6BFE` | `0x1ABFE-0x1B0FD` | `0x9300` |
 
-The physical source ranges are contiguous and their 85- and 80-tile blocks together account for all `0xA50` bytes. Tiles from both blocks match the title artwork in the screenshot. The six-byte field interpretation is based on the entries' structure, transfer-sized lengths, bank-6 source pointers, and VRAM destination addresses; the consuming routine has not been traced. The screen tilemap and palette are also not identified, so this maps the graphics data rather than the complete screen composition.
+The physical source ranges are contiguous and their 85- and 80-tile blocks together account for all `0xA50` bytes. Tiles from both blocks match the title artwork in the screenshot. The six-byte field interpretation is based on the entries' structure, transfer-sized lengths, bank-6 source pointers, and VRAM destination addresses; the consuming routine has not been traced.
+
+The title screen's arrangement above the START/CONTINUE line is a 20×13 grid of 8×8 cells, 160×104 pixels, from an emulator snapshot of the title screen (LCDC `0xE3`, BG map at `0x9800`, BGP `0x2D`). Cells hold tile IDs `0x30`-`0xD2` and map to the two blocks above: IDs `0x80`-`0xD2` come from `0x1A6AE` and IDs `0x30`-`0x7F` from `0x1ABFE`. The grid omits the menu cursor (sprite 0, tile `0xD4`, at x=16, y=104), the menu text, and the copyright tile `0xD3` below the START/CONTINUE line. The grid lives in `bin/art_layout.py` and is used by `rc2t hack dump-art title` and `rc2t hack read-art title`. Its tilemap and palette are not located in the ROM bytes, so the grid is an observed layout, not a decoded one. The routine that consumes the tilemap and palette has not been identified.
 
 ### In-UI character weapon and ability icons
 
@@ -755,7 +757,7 @@ Fixed-bank code at `0x009DE-0x009EB` loads one of these table bases (`0x7165` or
 | Runtime variables / character state | CPU addresses and the code that updates them are not yet established. See the separate save analysis for observed saved fields. |
 | Character templates / stats | HP, MP, attack, and ability tables are identified from the annotated dump in bank 5 above; consumers and some field meanings/boundaries remain to be verified. Other character data is not yet located. |
 | Maps / collision / encounters | Two world-map overview layouts and their graphics are identified above. Playable room layouts, collision, and encounters have no confirmed ROM offsets or formats yet. |
-| Text / character graphics | The cartridge title is at `0x0134-0x0143`; title-screen graphics in bank 6 and character graphics in bank 2 are documented above. The title screen's tilemap and palette, the routines that consume text, and the routines that consume graphics descriptors remain unidentified. Known text ranges are listed in [the known-text document](./known-text.md). |
+| Text / character graphics | The cartridge title is at `0x0134-0x0143`; title-screen graphics in bank 6 and character graphics in bank 2 are documented above. The title screen's tilemap is recorded as an observed grid from an emulator snapshot, with its palette BGP `0x2D`, but the ROM bytes that encode it, the routines that consume text, and the routines that consume graphics descriptors remain unidentified. Known text ranges are listed in [the known-text document](./known-text.md). |
 | Audio / music / sound effects | No code or data ranges identified yet. Game Boy sound registers are in `0xFF10-0xFF3F`, but that hardware fact does not identify the ROM routines or music data. |
 
 ## Next steps to turn this into a byte-level map
