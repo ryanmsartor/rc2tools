@@ -594,9 +594,21 @@ The range `0x18A1E-0x1A6AD` (7,312 bytes, exactly 457 16-byte 2bpp tiles) holds 
 
 The addresses are tentative. Individual boss boundaries, their animation frames, and the tables that reference them have not been traced, so this section does not list per-boss offsets. The range ends where the title-screen art begins at `0x1A6AE`.
 
-### Map-screen tiles (tentative)
+### World-map screen graphics and layouts
 
-The range `0x17185-0x17724` (1,440 bytes, 90 16-byte 2bpp tiles) holds graphics that are probably used for the map screen. The 16-byte lookup table at `0x17175-0x17184` ends right before it, and the tile grid starts exactly at `0x17185`. Starting there puts every tile boundary on a 16-byte step, so the bytes are not shifted.
+The map screen uses two 20×13 tile layouts in physical ROM bank 5, along with a set of 90 2bpp tiles at `0x17185-0x17724`. These are **overview screen graphics**, not the individual playable rooms or their collision data.
+
+| Physical ROM range (inclusive) | Contents |
+|---|---|
+| `0x17185-0x17724` | 90 2bpp tiles loaded at VRAM `0x8900`, corresponding to tile IDs `0x90-0xE9` |
+| `0x17725-0x1782D` | First map layout: header, 260 tile IDs, and a zero terminator |
+| `0x1782E-0x17936` | Second map layout: header, 260 tile IDs, and a zero terminator |
+
+Both layouts begin with `0D 14 00 9C`: 13 rows, 20 columns, and destination `0x9C00` in little-endian order. The tile IDs are row-major: the first layout's IDs are at `0x17729-0x1782C`, and the second's at `0x17832-0x17935`. Both end with `00`. Rendering the IDs against the tile set above produces two different bordered world-map images. The first includes more roads and a settlement at the lower right; the second has a different terrain and road arrangement. Their geographic names and the in-game condition choosing each layout are not yet established.
+
+The loader supports this interpretation independently of the rendered images. Fixed-bank code at `0x18DE` selects bank 5 and copies `0x05A0` bytes from CPU address `0x7185` to VRAM `0x8900`. Bank-6 code at physical `0x1B767` selects CPU pointer `0x7725` or `0x782E`; the path at `0x1B77D` passes it to the fixed-bank wrapper at `0x18C4`, which selects bank 5 and calls the loader at `0x0A78`. That loader reads the dimensions and destination, copies each row, and advances the destination by `0x20` bytes per row. Later code in the same path can apply additional VRAM updates; the base layouts alone do not necessarily show every marker or label.
+
+The graphics are shaded blue and the two layout records are shaded green by `--highlight-known`.
 
 Tiles within the range, aligned to that grid:
 
@@ -608,9 +620,7 @@ Tiles within the range, aligned to that grid:
 | `0x176F5-0x1770C` | Blank or near-blank tiles, not identified |
 | `0x17715-0x17724` | Downward cursor, likely the prompt to press A to continue scrolling text (interpretation unconfirmed) |
 
-Tiles from about `0x17305` through `0x17704` have repeated vertical-stripe patterns with long runs of identical bytes. It is not clear whether they are graphics or some other encoding, so the range includes them tentatively. From `0x17725` the bytes switch to runs of tile numbers, such as `9C B9 90 91 92 93`, which look like a tile map. That data is not in the range.
-
-The usage on the map screen has not been confirmed, and the tiles have not been traced to a loader. Go back and check the stripe area and the tile map later.
+Some tiles in the set have not been individually identified; the repeated patterns include terrain and border details visible in the reconstructed maps.
 
 ### Main bank-2 tile-data batch
 
@@ -736,7 +746,7 @@ Fixed-bank code at `0x009DE-0x009EB` loads one of these table bases (`0x7165` or
 | Engine / startup | Entry point, interrupt-vector targets, startup range, and several called CPU addresses are identified above. Most routines still need disassembly and naming. |
 | Runtime variables / character state | CPU addresses and the code that updates them are not yet established. See the separate save analysis for observed saved fields. |
 | Character templates / stats | HP, MP, attack, and ability tables are identified from the annotated dump in bank 5 above; consumers and some field meanings/boundaries remain to be verified. Other character data is not yet located. |
-| Maps / collision / encounters | No ROM file offsets or table format confirmed. |
+| Maps / collision / encounters | Two world-map overview layouts and their graphics are identified above. Playable room layouts, collision, and encounters have no confirmed ROM offsets or formats yet. |
 | Text / character graphics | The cartridge title is at `0x0134-0x0143`; title-screen graphics in bank 6 and character graphics in bank 2 are documented above. The title screen's tilemap and palette, the routines that consume text, and the routines that consume graphics descriptors remain unidentified. Known text ranges are listed in [the known-text document](./known-text.md). |
 | Audio / music / sound effects | No code or data ranges identified yet. Game Boy sound registers are in `0xFF10-0xFF3F`, but that hardware fact does not identify the ROM routines or music data. |
 

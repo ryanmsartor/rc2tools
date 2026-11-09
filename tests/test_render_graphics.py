@@ -177,7 +177,7 @@ class RenderGraphicsTests(unittest.TestCase):
         self.assertEqual(render_graphics.known_kind(0x1A6AD), "graphics")
         self.assertEqual(render_graphics.known_kind(0x17185), "graphics")
         self.assertEqual(render_graphics.known_kind(0x17724), "graphics")
-        self.assertIsNone(render_graphics.known_kind(0x17725))
+        self.assertEqual(render_graphics.known_kind(0x17725), "lookup")
         self.assertIsNone(render_graphics.known_kind(0x1B0FE))
         self.assertEqual(render_graphics.known_kind(0x17165), "lookup")
         self.assertEqual(render_graphics.known_kind(0x17184), "lookup")
@@ -388,6 +388,19 @@ class RenderGraphicsTests(unittest.TestCase):
         self.assertEqual(green_count(color_counts(table)), 32)
         self.assertEqual(render_graphics.known_kind(0x17184), "lookup")
         self.assertEqual(render_graphics.known_kind(0x17185), "graphics")
+
+    def test_world_map_layouts_are_highlighted_as_lookup_data(self):
+        tile = bytes([0xFF] * render_graphics.TILE_BYTES)
+        for address in (0x17725, 0x1782E, 0x17927):
+            with self.subTest(address=hex(address)):
+                image = render_graphics.render_tile_grid(
+                    tile, 1, 1, columns=1, scale=1, start_address=address, highlight_known=True
+                )
+                self.assertEqual(green_count(color_counts(image)), 64)
+        self.assertEqual(render_graphics.known_kind(0x17724), "graphics")
+        self.assertEqual(render_graphics.known_kind(0x17725), "lookup")
+        self.assertEqual(render_graphics.known_kind(0x17936), "lookup")
+        self.assertIsNone(render_graphics.known_kind(0x17937))
 
     def test_mixed_planes_use_the_plane_that_owns_each_pixel(self):
         # Low byte is graphics, high byte is text: pixels from each plane take that shade.
