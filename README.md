@@ -225,16 +225,28 @@ exists. You can also invoke
 and options. When run without a range, `./rc2t render-graphics` applies the
 default sprite grouping to the entire ROM, including non-graphics data.
 
-## Swap character sprites
+## Hack the ROM
 
-To create an IPS patch that swaps two characters' nine standard poses, defeat
-sprite, level-up face, and POW-screen portrait, run:
+`./rc2t hack` edits an in-progress copy of the ROM in `working/`, named
+`Rolan's Curse II (USA) (hack in progress).gb`. Every `hack` subcommand creates
+that copy from `input/` first if it does not exist.
 
 ```sh
-./rc2t swap-character-sprite hero pit
+./rc2t hack reset     # delete the in-progress copy and replace it with a fresh copy of input/
+./rc2t hack clear     # delete the in-progress copy
+./rc2t hack finalize  # copy the in-progress copy to output/ and write an IPS patch
+./rc2t hack swap-character-sprite hero pit  # edit the in-progress copy in place
 ```
 
-This writes `output/swap-hero-pit-sprites.ips`, using the default ROM. Character
-names are `hero`, `pit`, `lane`, `kyle`, `jude`, `lee`, `lora`, and `zold`.
-When `input/Rolan's Curse II (USA).gb` is present and valid, the command also
-writes the fully patched ROM to `output/Rolan's Curse II (USA) (hero-pit).gb`.
+Character names for `swap-character-sprite` are `hero`, `pit`, `lane`, `kyle`,
+`jude`, `lee`, `lora`, and `zold`. The swap exchanges the nine standard poses,
+defeat sprite, level-up face, and POW-screen portrait of the two characters.
+
+Each applied hack is recorded in `working/hacks.txt`, one line per hack. `reset`
+and `clear` delete this file, and `swap-character-sprite` appends to it.
+`finalize` does not copy it to `output/`.
+
+`finalize` writes `output/Rolan's Curse II (USA) (hack finalized).gb` and
+`output/Rolan's Curse II (USA) (hack finalized).ips`. The patch is a diff from
+the original `input/` ROM to the finalized ROM, and it replaces any previous
+finalized files. The `working/` directory is ignored by git.

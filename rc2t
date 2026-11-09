@@ -18,7 +18,7 @@ rc2t_print_help_message() {
     echo "  dump-text [rom-or-hex [output]]  Dump documented text ranges into output/known-text.txt"
     echo "  decompile | disassemble [rom [output]] [--start OFFSET] [--end OFFSET]  Disassemble a Game Boy ROM"
     echo "  recompile [assembly-file]  Assemble an input/ .asm file into output/<basename> (recompiled).gb"
-    echo "  swap-character-sprite <character1> <character2>  Swap sprites and POW portraits"
+    echo "  hack <subcommand>  Edit the working/ hack copy: clear | reset | finalize | swap-character-sprite <character1> <character2>"
 }
 
 _check_if_rom_exists() {
@@ -98,8 +98,8 @@ case "$1" in
         python3 bin/recompile_rom.py "${@:2}"
         ;;
 
-    swap-character-sprite)
-        python3 bin/swap_character_sprite.py "${@:2}"
+    hack)
+        python3 bin/hack_rom.py "${@:2}"
         ;;
 
     *)

@@ -14,25 +14,8 @@ swap_character_sprite = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(swap_character_sprite)
 
 
-def parse_ips(patch):
-    if not patch.startswith(b"PATCH"):
-        raise ValueError("missing IPS header")
-    records = {}
-    offset = 5
-    while patch[offset:offset + 3] != b"EOF":
-        address = int.from_bytes(patch[offset:offset + 3], "big")
-        size = int.from_bytes(patch[offset + 3:offset + 5], "big")
-        if size == 0:
-            raise ValueError("unexpected RLE record")
-        records[address] = patch[offset + 5:offset + 5 + size]
-        offset += 5 + size
-    if patch[offset + 3:]:
-        raise ValueError("trailing IPS data")
-    return records
-
-
 class SwapCharacterSpriteTests(unittest.TestCase):
-    def test_patch_swaps_sprite_regions_and_pow_portrait(self):
+    def test_swaps_sprite_regions_and_pow_portrait_in_place(self):
         rom = bytearray(0x20000)
         first = swap_character_sprite.CHARACTER_SPRITES["hero"]
         second = swap_character_sprite.CHARACTER_SPRITES["pit"]
@@ -45,40 +28,37 @@ class SwapCharacterSpriteTests(unittest.TestCase):
         for index, (first_offset, second_offset, size) in enumerate(segments):
             rom[first_offset:first_offset + size] = bytes([0x10 + index]) * size
             rom[second_offset:second_offset + size] = bytes([0x20 + index]) * size
+        original = bytes(rom)
 
-        patch, patched_rom = swap_character_sprite.build_swap_artifacts(rom, "hero", "pit")
-        records = parse_ips(patch)
-        self.assertEqual(patch[-3:], b"EOF")
-        self.assertEqual(
-            {offset: len(data) for offset, data in records.items()},
-            {
-                first[0]: swap_character_sprite.STANDARD_SPRITE_BYTES,
-                second[0]: swap_character_sprite.STANDARD_SPRITE_BYTES,
-                first[1]: swap_character_sprite.SPRITE_BYTES,
-                second[1]: swap_character_sprite.SPRITE_BYTES,
-                first[2]: swap_character_sprite.SPRITE_BYTES,
-                second[2]: swap_character_sprite.SPRITE_BYTES,
-                first[3]: swap_character_sprite.POW_PORTRAIT_BYTES,
-                second[3]: swap_character_sprite.POW_PORTRAIT_BYTES,
-            },
-        )
+        swap_character_sprite.swap_character_sprites(rom, "hero", "pit")
 
-        patched = bytearray(rom)
-        for offset, data in records.items():
-            patched[offset:offset + len(data)] = data
-        expected = bytearray(rom)
+        expected = bytearray(original)
         for first_offset, second_offset, size in segments:
-            expected[first_offset:first_offset + size] = rom[second_offset:second_offset + size]
-            expected[second_offset:second_offset + size] = rom[first_offset:first_offset + size]
-        self.assertEqual(patched, expected)
-        self.assertEqual(patched_rom, expected)
+            expected[first_offset:first_offset + size] = original[second_offset:second_offset + size]
+            expected[second_offset:second_offset + size] = original[first_offset:first_offset + size]
+        self.assertEqual(rom, expected)
+
+    def test_swapping_same_pair_twice_restores_original_rom(self):
+        rom = bytearray(range(256)) * 0x200
+        original = bytes(rom)
+        swap_character_sprite.swap_character_sprites(rom, "lane", "zold")
+        self.assertNotEqual(bytes(rom), original)
+        swap_character_sprite.swap_character_sprites(rom, "zold", "lane")
+        self.assertEqual(bytes(rom), original)
+
+    def test_rejects_rom_without_complete_sprite_data_and_leaves_it_unchanged(self):
+        rom = bytearray(0x1000)
+        original = bytes(rom)
+        with self.assertRaises(ValueError):
+            swap_character_sprite.swap_character_sprites(rom, "hero", "pit")
+        self.assertEqual(bytes(rom), original)
 
     def test_rejects_unknown_or_identical_characters(self):
         for character1, character2 in (("hero", "unknown"), ("hero", "hero")):
             with self.subTest(characters=(character1, character2)):
                 with self.assertRaises(ValueError):
-                    swap_character_sprite.build_swap_artifacts(
-                        bytes(0x20000),
+                    swap_character_sprite.swap_character_sprites(
+                        bytearray(0x20000),
                         character1,
                         character2,
                     )
