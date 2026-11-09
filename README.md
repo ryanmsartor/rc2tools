@@ -1,6 +1,9 @@
 # rc2tools
 A collection of tools for hacking Rolan's Curse 2 for Game Boy
 
+For project licensing, game rights, and third-party credits, see
+[LEGAL.md](LEGAL.md).
+
 ## Extract character stats
 
 Requires Python 3.10 or later and Bash. From the repository root, run:

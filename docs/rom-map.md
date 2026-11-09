@@ -76,11 +76,19 @@ This numeric structure is not raw 2bpp graphics data. It is likely a geometric/v
 
 The following identification is based on decoding bytes as Game Boy 2bpp tiles and matching them to screenshots. The tile matches confirm the format and the listed sprite tiles; descriptor fields are interpreted from their layout, but their consuming code has not been traced.
 
+Screenshot references previously stored in this repository:
+
+- Opening dialogue: [LaunchBox image](https://images.launchbox-app.com/bd8cb660-d917-483a-96c5-a3e28dc8de02.png).
+- Character status screens: [Mattozoic image](https://mattozoic.com/wp-content/uploads/2017/04/Status-1.png).
+- Title screen: [Mattozoic image](https://mattozoic.com/wp-content/uploads/2017/04/Title-2.png).
+
+The latter two appear in [Mattozoic's Rolan's Curse 2 article](https://mattozoic.com/?p=1296).
+
 Unless noted otherwise, source ranges below are physical ROM offsets in **bank 2**. For a CPU source pointer in the banked window, add `0x4000` to obtain the physical offset; conversely, subtract `0x4000` from the physical offset to obtain the CPU address with bank 2 selected. Each uncompressed 2bpp tile is 16 bytes (8×8 pixels).
 
 ### Title-screen graphics
 
-Matching tiles against [screenshot 3](./screenshot_3.png) identifies a contiguous `0xA50`-byte title-screen graphics block in physical bank 6, from `0x1A6AE` through `0x1B0FD` inclusive. The bytes decode as raw, uncompressed Game Boy 2bpp tiles (165 tiles at 16 bytes each).
+Matching tiles against the [title-screen image](https://mattozoic.com/wp-content/uploads/2017/04/Title-2.png) identifies a contiguous `0xA50`-byte title-screen graphics block in physical bank 6, from `0x1A6AE` through `0x1B0FD` inclusive. The bytes decode as raw, uncompressed Game Boy 2bpp tiles (165 tiles at 16 bytes each).
 
 A descriptor table at physical offset `0x18110` (CPU address `0x4110` with bank 6 selected) contains two adjacent six-byte entries. Interpreting each entry as little-endian byte length, source CPU address, and VRAM destination gives:
 
