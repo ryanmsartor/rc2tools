@@ -355,24 +355,39 @@ class RenderGraphicsTests(unittest.TestCase):
 
     def test_text_highlight_stops_at_its_end_address(self):
         tile = bytes([0xFF] * render_graphics.TILE_BYTES)
-        # Bytes 0xBFA8-0xBFAB are text; 0xBFAC onward is not.
+        # 0xBFAB is the exclusive end of the documented credits range.
         image = render_graphics.render_tile_grid(
             tile, 1, 1, columns=1, scale=1, start_address=0xBFA8, highlight_known=True
         )
-        self.assertEqual(yellow_count(color_counts(image)), 16)
+        self.assertEqual(yellow_count(color_counts(image)), 8)
         self.assertEqual(blue_count(color_counts(image)), 0)
+        self.assertEqual(render_graphics.known_kind(0xBFAA), "text")
+        self.assertIsNone(render_graphics.known_kind(0xBFAB))
 
-    def test_dialogue_ranges_shade_in_yellow_up_to_their_end(self):
+    def test_documented_text_and_table_ranges_shade_in_yellow(self):
         tile = bytes([0xFF] * render_graphics.TILE_BYTES)
-        inside = render_graphics.render_tile_grid(
-            tile, 1, 1, columns=1, scale=1, start_address=0x1C0C0, highlight_known=True
+        for address in (0x050CB, 0x17D4E, 0x1BD4E, 0x1C0F5, 0x1E620):
+            with self.subTest(address=hex(address)):
+                image = render_graphics.render_tile_grid(
+                    tile,
+                    1,
+                    1,
+                    columns=1,
+                    scale=1,
+                    start_address=address,
+                    highlight_known=True,
+                )
+                self.assertEqual(yellow_count(color_counts(image)), 64)
+        self.assertEqual(render_graphics.known_kind(0x050CA), None)
+        self.assertEqual(render_graphics.known_kind(0x050CB), "text")
+        self.assertEqual(render_graphics.known_kind(0x050E6), "text")
+        self.assertEqual(render_graphics.known_kind(0x050E7), None)
+        table = render_graphics.render_tile_grid(
+            tile, 1, 1, columns=1, scale=1, start_address=0x1717C, highlight_known=True
         )
-        # 0x1C0F5-0x1C10B is a 23-byte control gap, so this whole tile is outside every text run.
-        after = render_graphics.render_tile_grid(
-            tile, 1, 1, columns=1, scale=1, start_address=0x1C0F5, highlight_known=True
-        )
-        self.assertEqual(yellow_count(color_counts(inside)), 64)
-        self.assertEqual(yellow_count(color_counts(after)), 0)
+        self.assertEqual(green_count(color_counts(table)), 32)
+        self.assertEqual(render_graphics.known_kind(0x17184), "lookup")
+        self.assertEqual(render_graphics.known_kind(0x17185), "graphics")
 
     def test_mixed_planes_use_the_plane_that_owns_each_pixel(self):
         # Low byte is graphics, high byte is text: pixels from each plane take that shade.
