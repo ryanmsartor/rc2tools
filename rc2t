@@ -15,6 +15,7 @@ rc2t_print_help_message() {
     echo "    --highlight-known  Shade documented graphics in blue, text in yellow, and lookup or stat tables in green"
     echo "    --stacked-glyphs   Render 16-byte tiles as two stacked 1bpp glyphs"
     echo "  render-text         Decode the entire ROM into output/rom-text.txt as one string"
+    echo "  dump-text [rom-or-hex [output]]  Dump documented text ranges into output/known-text.txt"
     echo "  decompile | disassemble [rom [output]] [--start OFFSET] [--end OFFSET]  Disassemble a Game Boy ROM"
     echo "  recompile [assembly-file]  Assemble an input/ .asm file into output/<basename> (recompiled).gb"
     echo "  swap-character-sprite <character1> <character2>  Swap sprites and POW portraits"
@@ -83,6 +84,10 @@ case "$1" in
 
     render-text)
         python3 bin/render_text.py "${@:2}"
+        ;;
+
+    dump-text)
+        python3 bin/dump_text.py "${@:2}"
         ;;
 
     decompile|disassemble)

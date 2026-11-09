@@ -1,0 +1,87 @@
+#!/usr/bin/env python3
+"""Dump documented text ranges from the Rolan's Curse II (USA) ROM."""
+
+import argparse
+import sys
+from pathlib import Path
+
+from extract_json import read_rom
+from render_text import DEFAULT_ROM, decode, glyph_for
+
+ROOT = Path(__file__).resolve().parent.parent
+DEFAULT_OUTPUT = ROOT / "output" / "known-text.txt"
+TITLE_RANGE = (0x00134, 0x00144)
+
+# Exact, exclusive-end ranges described in docs/known-text.md; overlaps are intentional.
+TEXT_RANGES = (
+    (0x04736, 0x04823), (0x04998, 0x049A9), (0x04A7C, 0x04AC9),
+    (0x050CB, 0x050E7), (0x05109, 0x0511B), (0x058EB, 0x0590F),
+    (0x0BC86, 0x0BD1D), (0x0BD1E, 0x0BFAB),
+    (0x17C8D, 0x17CF4), (0x17D4E, 0x17D6F), (0x17D70, 0x17D80),
+    (0x1B315, 0x1B32E), (0x1B9AA, 0x1B9C7), (0x1BABA, 0x1BACC),
+    (0x1BD4E, 0x1BD6F), (0x1BD70, 0x1BD80),
+    (0x1C0C0, 0x1C0F7), (0x1C0F5, 0x1C10B), (0x1C10C, 0x1C14A),
+    (0x1C1AC, 0x1C222), (0x1C222, 0x1C258), (0x1C258, 0x1C2A9),
+    (0x1C2A9, 0x1C2DA), (0x1C2DA, 0x1C32A), (0x1C32D, 0x1C35E),
+    (0x1C35E, 0x1C3AE), (0x1C3AE, 0x1C4B7), (0x1C4B7, 0x1C4DC),
+    (0x1C4DC, 0x1C567), (0x1C567, 0x1C5C3), (0x1C5C5, 0x1C6AA),
+    (0x1C6AC, 0x1C788), (0x1C788, 0x1C7B6), (0x1C7B6, 0x1C7DA),
+    (0x1C7DA, 0x1C81D), (0x1C820, 0x1C83D), (0x1C83D, 0x1C84D),
+    (0x1C84D, 0x1C94C), (0x1C94C, 0x1C9EC), (0x1C9EC, 0x1CA4E),
+    (0x1CA4E, 0x1CAC5), (0x1CAAB, 0x1CAC5), (0x1CAC7, 0x1CBD9),
+    (0x1CBD9, 0x1CC2F), (0x1CC2F, 0x1CC8C), (0x1CC8C, 0x1CCB9),
+    (0x1CCB9, 0x1CCCE), (0x1CCD0, 0x1CCFD), (0x1CCE9, 0x1CCFD),
+    (0x1CCFD, 0x1CDCD), (0x1CDCD, 0x1CE92), (0x1CE92, 0x1CF23),
+    (0x1CF23, 0x1CFA8), (0x1CFAB, 0x1CFC8), (0x1CFCA, 0x1D028),
+    (0x1D028, 0x1D26E), (0x1D23D, 0x1D26E), (0x1D270, 0x1D2C8),
+    (0x1D2C8, 0x1D2FC), (0x1D2FC, 0x1D382), (0x1D362, 0x1D382),
+    (0x1D382, 0x1D3F1), (0x1D3D0, 0x1D3F1), (0x1D3F4, 0x1D411),
+    (0x1D411, 0x1D47C), (0x1D47C, 0x1D58B), (0x1D58B, 0x1D61C),
+    (0x1D61E, 0x1D697), (0x1D697, 0x1D781), (0x1D781, 0x1D7F8),
+    (0x1D7F8, 0x1D87E), (0x1D87E, 0x1D89B), (0x1D89B, 0x1D96B),
+    (0x1D96B, 0x1D9EA), (0x1D9EA, 0x1DB1C), (0x1DB1C, 0x1DBB6),
+    (0x1DBB8, 0x1DBE0), (0x1DBE3, 0x1DC00), (0x1DC00, 0x1DD26),
+    (0x1DD26, 0x1DD55), (0x1DD57, 0x1DDB5), (0x1DDB7, 0x1DE21),
+    (0x1DE21, 0x1DE52), (0x1DE52, 0x1DFDE), (0x1DFDE, 0x1E17B),
+    (0x1E17B, 0x1E20F), (0x1E20F, 0x1E231), (0x1E231, 0x1E257),
+    (0x1E257, 0x1E26F), (0x1E26F, 0x1E295), (0x1E295, 0x1E2AB),
+    (0x1E2AB, 0x1E314), (0x1E2E7, 0x1E314), (0x1E620, 0x1E646),
+    (0x1E646, 0x1E647), (0x1E66B, 0x1E68A), (0x1E68A, 0x1E68B),
+    (0x1E68A, 0x1E6AB), (0x1E6AB, 0x1E6AC),
+)
+
+
+def dump_text(rom: bytes) -> str:
+    """Render each documented physical ROM range, including overlapping fragments."""
+    ranges = sorted((TITLE_RANGE, *TEXT_RANGES))
+    if len(rom) < max(end for _, end in ranges):
+        raise ValueError("ROM is too short to contain the documented text ranges")
+    lines = []
+    for start, end in ranges:
+        data = rom[start:end]
+        if (start, end) == TITLE_RANGE:
+            text = "".join(chr(byte) if 0x20 <= byte <= 0x7E else glyph_for(byte) for byte in data)
+        else:
+            text = decode(data)
+        lines.append(f"0x{start:05X}-0x{end:05X} : {text}")
+    return "\n".join(lines) + "\n"
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("input", nargs="?", type=Path, default=DEFAULT_ROM, help="ROM or full .hex dump")
+    parser.add_argument("output", nargs="?", type=Path, default=DEFAULT_OUTPUT, help="output text file")
+    args = parser.parse_args(argv)
+    try:
+        text = dump_text(read_rom(args.input))
+        args.output.parent.mkdir(parents=True, exist_ok=True)
+        args.output.write_text(text, encoding="utf-8", newline="\n")
+    except (OSError, UnicodeError, ValueError) as error:
+        print(f"Error: {error}", file=sys.stderr)
+        return 1
+    print(f"Wrote {args.output}")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

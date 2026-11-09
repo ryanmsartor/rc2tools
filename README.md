@@ -137,6 +137,25 @@ Decode the whole ROM through the documented character table into one string (`ou
 ./rc2t render-text
 ```
 
+Dump all identified text ranges, including overlapping fragments, credits,
+name lists, alphabet tables, and unclassified control-byte runs:
+
+```sh
+./rc2t dump-text
+./rc2t dump-text path/to/game.gb output/known-text.txt
+```
+
+The default output is `output/known-text.txt`. Each line has the format
+`0xSSSSS-0xEEEEE : decoded text`, using zero-padded physical ROM offsets;
+the end is exclusive. Exact duplicate ranges are listed once, but distinct
+overlapping ranges are kept. Output follows the character table and unknown
+byte placeholders used by `render-text`; the ASCII cartridge title is decoded
+as ASCII, with its non-printable padding shown as a placeholder. Name lists
+are raw decoded bytes, including unidentified separators. The ROM must match
+the Rolan's Curse II (USA) size and header;
+a complete `.hex` dump is also accepted. Existing output is overwritten.
+Update the range list in `bin/dump_text.py` when documenting new text.
+
 The highlighted physical-ROM ranges follow the graphics and text documented in
 [the ROM map](./docs/rom-map.md) and [the known-text list](./docs/known-text.md). Highlighting follows the known byte ranges,
 even when a range starts or ends inside a rendered tile. A pixel is blue when
