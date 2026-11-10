@@ -19,6 +19,7 @@ POINTER = 0x1800A
 STOCK_LIST = 0x18110
 ROM_SIZE = 0x20000
 CELLS = 20 * 13
+IMAGE_CELLS = 20 * 11
 FREE_RUNS = ((0x61, 0x100), (0x3FC6, 0x3FFF), (0x1BF80, 0x1C000))
 
 
@@ -30,7 +31,8 @@ def title_rom(seed=1):
     stock_ids = list(range(0x31, 0xD3))
     for cell in range(CELLS):
         row, col = divmod(cell, 20)
-        rom[TILEMAP + row * 20 + col] = rng.choice(stock_ids)
+        blank_margin = row in (0, 12)
+        rom[TILEMAP + cell] = 0x30 if blank_margin else rng.choice(stock_ids)
     rom[STOCK_LIST:STOCK_LIST + 14] = (
         struct.pack("<HHH", 0x0550, 0x66AE, 0x8800) + struct.pack("<HHH", 0x0500, 0x6BFE, 0x9300) + b"\x00\x00"
     )
@@ -83,8 +85,8 @@ class TitleLayoutTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.layout.in_place_offset(0x3E)
 
-    def test_image_is_20_by_13_cells(self):
-        self.assertEqual(self.layout.image_size, (160, 104))
+    def test_image_is_20_by_11_cells_without_margins(self):
+        self.assertEqual(self.layout.image_size, (160, 88))
 
     def test_list_goes_where_it_leaves_most_slots(self):
         size = 6 * (2 + 14) + 2
@@ -100,7 +102,7 @@ class TitleLayoutTests(unittest.TestCase):
     def test_render_produces_only_palette_shades(self):
         image = art_layout.render_art(self.layout, title_rom())
         self.assertEqual(image.mode, "L")
-        self.assertEqual(image.size, (160, 104))
+        self.assertEqual(image.size, (160, 88))
         self.assertTrue(set(image.getdata()) <= set(self.layout.shades))
 
     def test_round_trip_of_stock_render_is_identity(self):
@@ -112,7 +114,7 @@ class TitleLayoutTests(unittest.TestCase):
 
     def test_maximum_unique_tiles_round_trip(self):
         tiles = distinct_tiles(self.layout, 175)
-        cells = tiles + [tiles[0]] * (CELLS - 175)
+        cells = tiles + [tiles[0]] * (IMAGE_CELLS - 175)
         image = image_from_cells(self.layout, cells)
         rom = title_rom()
         count = art_layout.apply_art(self.layout, rom, image)
@@ -122,7 +124,7 @@ class TitleLayoutTests(unittest.TestCase):
 
     def test_copy_list_terminates_after_stock_and_extra_records(self):
         tiles = distinct_tiles(self.layout, 175)
-        image = image_from_cells(self.layout, tiles + [tiles[0]] * (CELLS - 175))
+        image = image_from_cells(self.layout, tiles + [tiles[0]] * (IMAGE_CELLS - 175))
         rom = title_rom()
         art_layout.apply_art(self.layout, rom, image)
         self.assertEqual(rom[0x61 + 6 * 15:0x61 + 6 * 15 + 2], b"\x10\x00")
@@ -130,7 +132,7 @@ class TitleLayoutTests(unittest.TestCase):
 
     def test_too_many_unique_tiles_fails_without_writing(self):
         tiles = distinct_tiles(self.layout, 176)
-        image = image_from_cells(self.layout, tiles + [tiles[0]] * (CELLS - 176))
+        image = image_from_cells(self.layout, tiles + [tiles[0]] * (IMAGE_CELLS - 176))
         rom = title_rom()
         original = bytes(rom)
         with self.assertRaises(ValueError):
@@ -167,6 +169,17 @@ class TitleLayoutTests(unittest.TestCase):
         restored = bytearray(rom)
         art_layout.apply_art(self.layout, restored, noisy)
         self.assertEqual(art_layout.render_art(self.layout, restored).tobytes(), image.tobytes())
+
+    def test_apply_leaves_blank_margin_rows_untouched(self):
+        rom = title_rom()
+        image = art_layout.render_art(self.layout, rom)
+        tiles = distinct_tiles(self.layout, 175)
+        edited_image = image_from_cells(self.layout, tiles + [tiles[0]] * (IMAGE_CELLS - 175))
+        edited = bytearray(rom)
+        art_layout.apply_art(self.layout, edited, edited_image)
+        self.assertEqual(edited[TILEMAP:TILEMAP + 20], rom[TILEMAP:TILEMAP + 20])
+        self.assertEqual(edited[TILEMAP + 240:TILEMAP + 260], rom[TILEMAP + 240:TILEMAP + 260])
+        self.assertEqual(set(edited[TILEMAP:TILEMAP + 20]), {0x30})
 
 
 def different_shade(layout, shade):

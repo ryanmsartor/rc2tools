@@ -237,13 +237,15 @@ address labels. Ranges that span several banks use the same layout.
 `Rolan's Curse II (USA) (hack in progress).gb`. Every `hack` subcommand creates
 that copy from `input/` first if it does not exist.
 
+`./rc2h` is a shorthand for `./rc2t hack` and accepts the same arguments.
+
 ```sh
 ./rc2t hack reset     # delete the in-progress copy and replace it with a fresh copy of input/
 ./rc2t hack clear     # delete the in-progress copy
 ./rc2t hack finalize  # copy the in-progress copy to output/ and write an IPS patch
 ./rc2t hack swap-char-sprite hero pit  # edit the in-progress copy in place
 ./rc2t hack dump-art title   # write working/title-art.png from the in-progress copy
-./rc2t hack read-art title   # apply an edited working/title-art.png to the in-progress copy
+./rc2t hack inject-art title   # apply an edited working/title-art.png to the in-progress copy
 ```
 
 Character names for `swap-char-sprite` are `hero`, `pit`, `lane`, `kyle`,
@@ -251,20 +253,22 @@ Character names for `swap-char-sprite` are `hero`, `pit`, `lane`, `kyle`,
 defeat sprite, level-up face, and POW-screen portrait of the two characters.
 
 `dump-art title` writes the title screen's logo above the START/CONTINUE line to
-`working/title-art.png`. The image is 160×104 pixels, the top 13 rows of the
-Game Boy screen, and the art is arranged as it appears on screen. The four
+`working/title-art.png`. The image is 160×88 pixels: the art's 11 rows of
+8×8 cells, arranged as they appear on screen. The blank top and bottom rows of
+the 13-row grid are left out of the image and stay in the ROM as a margin, so
+`inject-art` never changes them. The four
 shades are the title screen's palette (BGP `0x2D`): index 0 is light gray, 1 is
 black, 2 is dark gray, and 3 is white. The menu cursor, the START and CONTINUE
 text, and the copyright line are not part of the image.
 
-`read-art title` reads `working/title-art.png` and writes the tiles back into
-the in-progress copy. The image must be exactly 160×104 pixels. Each pixel is
+`inject-art title` reads `working/title-art.png` and writes the tiles back into
+the in-progress copy. The image must be exactly 160×88 pixels. Each pixel is
 mapped to the nearest of the four shades. Some tiles appear in more than one
 cell, such as the blank filler tile `0x30`, so every cell that uses such a tile
-must have the same pixels. Otherwise `read-art` fails and changes nothing.
+must have the same pixels. Otherwise `inject-art` fails and changes nothing.
 
 Each applied hack is recorded in `working/hacks.txt`, one line per hack. `reset`
-and `clear` delete this file, and `swap-char-sprite` and `read-art` append to it.
+and `clear` delete this file, and `swap-char-sprite` and `inject-art` append to it.
 `finalize` does not copy it to `output/`.
 
 `finalize` writes `output/Rolan's Curse II (USA) (hack finalized).gb` and

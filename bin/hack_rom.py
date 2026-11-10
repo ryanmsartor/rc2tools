@@ -116,7 +116,7 @@ def read_art(name: str) -> None:
     with Image.open(path) as image:
         apply_art(ART_LAYOUTS[name], rom, image)
     WORKING_ROM_PATH.write_bytes(rom)
-    record_hack(f"read-art {name}")
+    record_hack(f"inject-art {name}")
     print(f"Applied {path} to {WORKING_ROM_PATH}")
 
 
@@ -173,7 +173,7 @@ def main() -> int:
     )
     _add_art_arguments(dump_parser)
     read_parser = subparsers.add_parser(
-        "read-art",
+        "inject-art",
         help="apply working/<name>-art.png to the in-progress hack",
     )
     _add_art_arguments(read_parser)
@@ -197,7 +197,7 @@ def main() -> int:
             apply_swap_character_sprite(args.character1, args.character2)
         elif args.subcommand == "dump-art":
             dump_art(args.name)
-        elif args.subcommand == "read-art":
+        elif args.subcommand == "inject-art":
             read_art(args.name)
     except (OSError, ValueError) as error:
         print(f"Error: {error}", file=sys.stderr)

@@ -29,6 +29,7 @@ class HackWrapperTests(unittest.TestCase):
         (self.root / "input").mkdir()
         (self.root / "output").mkdir()
         shutil.copy2(ROOT / "rc2t", self.root / "rc2t")
+        shutil.copy2(ROOT / "rc2h", self.root / "rc2h")
         for name in ("hack_rom.py", "swap_character_sprite.py", "art_layout.py"):
             shutil.copy2(ROOT / "bin" / name, self.root / "bin" / name)
         self.rom = bytes(range(256)) * 0x200
@@ -226,13 +227,37 @@ class HackWrapperTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("usage", result.stderr)
 
+    def test_rc2h_forwards_arguments_and_exit_status(self):
+        for args in (("--help",), ("dump-art", "not a title"), ()):
+            with self.subTest(args=args):
+                expected = self.run_wrapper(*args)
+                result = subprocess.run(
+                    [str(self.root / "rc2h"), *args],
+                    cwd=self.root / "input",
+                    capture_output=True,
+                    text=True,
+                )
+                self.assertEqual(result.returncode, expected.returncode)
+                self.assertEqual(result.stdout, expected.stdout)
+                self.assertEqual(result.stderr, expected.stderr)
+
+    def test_rc2h_runs_hack_subcommand(self):
+        result = subprocess.run(
+            [str(self.root / "rc2h"), "reset"],
+            cwd=self.root / "input",
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self.working.read_bytes(), self.rom)
+
     def test_dump_art_writes_title_png_without_logging(self):
         self.use_input_rom(self.build_sprite_rom())
         self.run_wrapper("reset")
         result = self.run_wrapper("dump-art", "title")
         self.assertEqual(result.returncode, 0, result.stderr)
         with Image.open(self.root / "working" / "title-art.png") as image:
-            self.assertEqual(image.size, (160, 104))
+            self.assertEqual(image.size, (160, 88))
         self.assertEqual(self.hacks_log.read_text(), "")
 
     def test_read_art_applies_png_and_logs_hack(self):
@@ -245,15 +270,15 @@ class HackWrapperTests(unittest.TestCase):
             edited = image.convert("L")
         edited.putpixel((12 * 8, 1 * 8), 0)
         edited.save(png)
-        result = self.run_wrapper("read-art", "title")
+        result = self.run_wrapper("inject-art", "title")
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(self.hacks_log.read_text(), "read-art title\n")
+        self.assertEqual(self.hacks_log.read_text(), "inject-art title\n")
         self.assertNotEqual(self.working.read_bytes(), bytes(rom))
 
     def test_read_art_without_png_fails_and_leaves_rom_unchanged(self):
         self.run_wrapper("reset")
         before = self.working.read_bytes()
-        result = self.run_wrapper("read-art", "title")
+        result = self.run_wrapper("inject-art", "title")
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("Error:", result.stderr)
         self.assertEqual(self.working.read_bytes(), before)

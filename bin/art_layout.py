@@ -1,11 +1,11 @@
-"""Named ROM art layouts for `rc2t hack dump-art` and `rc2t hack read-art`.
+"""Named ROM art layouts for `rc2t hack dump-art` and `rc2t hack inject-art`.
 
 The title screen's BG map is a tilemap in the ROM. Its tiles are loaded by a
 copy list: six-byte records (length, source CPU address, VRAM destination, all
 little-endian) ending with a zero length. Tile IDs are BG-map IDs under signed
 tile addressing (LCDC=0xE3).
 
-`read-art` rewrites the tilemap and copy list. Stock tiles are rewritten in
+`inject-art` rewrites the tilemap and copy list. Stock tiles are rewritten in
 place, and any extra tiles are copied from free ROM space.
 """
 
@@ -31,6 +31,10 @@ class ArtLayout:
     tilemap_offset: int
     columns: int
     rows: int
+    # Blank grid rows at the top and bottom. They stay as they are in the ROM
+    # and are not part of the image.
+    margin_top: int
+    margin_bottom: int
     # File offset of the word holding the CPU address of the copy list.
     pointer_offset: int
     # Stock copy records (length, source CPU address, VRAM destination).
@@ -48,8 +52,12 @@ class ArtLayout:
     shades: Tuple[int, int, int, int]
 
     @property
+    def image_rows(self) -> int:
+        return self.rows - self.margin_top - self.margin_bottom
+
+    @property
     def image_size(self) -> Tuple[int, int]:
-        return (self.columns * TILE_SIZE, self.rows * TILE_SIZE)
+        return (self.columns * TILE_SIZE, self.image_rows * TILE_SIZE)
 
     def in_place_ids(self) -> List[int]:
         return [tile_id for first, last, _ in self.in_place_blocks for tile_id in range(first, last + 1)]
@@ -65,12 +73,15 @@ ART_LAYOUTS = {
     # The stock list copies tile blocks 0x80-0xD4 to VRAM 0x8800 and 0x30-0x7F
     # to VRAM 0x9300. Tiles 0x30, 0x3E, 0xD3 and 0xD4 (blank, a menu glyph
     # shared with the title's tilemap rows 13-17, copyright and menu cursor)
-    # are not rewritten. Shades are colour indices 0-3 under the title screen
-    # palette, BGP 0x2D.
+    # are not rewritten. Grid rows 0 and 12 are blank margins (tile 0x30), so
+    # the image is rows 1-11. Shades are colour indices 0-3 under the title
+    # screen palette, BGP 0x2D.
     "title": ArtLayout(
         tilemap_offset=0x13C34,
         columns=20,
         rows=13,
+        margin_top=1,
+        margin_bottom=1,
         pointer_offset=0x1800A,
         stock_copies=((0x0550, 0x66AE, 0x8800), (0x0500, 0x6BFE, 0x9300)),
         in_place_blocks=((0x31, 0x3D, 0x1AC0E), (0x3F, 0x7F, 0x1ACEE), (0x80, 0xD2, 0x1A6AE)),
@@ -139,13 +150,14 @@ def _load_vram(layout: ArtLayout, rom: bytes) -> bytearray:
 def render_art(layout: ArtLayout, rom: bytes) -> Image.Image:
     vram = _load_vram(layout, rom)
     image = Image.new("L", layout.image_size, layout.shades[3])
-    for row in range(layout.rows):
+    for image_row in range(layout.image_rows):
+        row = layout.margin_top + image_row
         for col in range(layout.columns):
             tile_id = rom[layout.tilemap_offset + row * layout.columns + col]
             pixels = _decode_tile(vram, _tile_vram(tile_id) - VRAM_BASE)
             for y, indices in enumerate(pixels):
                 for x, index in enumerate(indices):
-                    image.putpixel((col * TILE_SIZE + x, row * TILE_SIZE + y), layout.shades[index])
+                    image.putpixel((col * TILE_SIZE + x, image_row * TILE_SIZE + y), layout.shades[index])
     return image
 
 
@@ -182,10 +194,10 @@ def apply_art(layout: ArtLayout, rom: bytearray, image: Image.Image) -> int:
     patterns: List[Tuple[int, ...]] = []
     pattern_index: Dict[Tuple[int, ...], int] = {}
     cells: List[int] = []
-    for row in range(layout.rows):
+    for image_row in range(layout.image_rows):
         for col in range(layout.columns):
             pattern = tuple(
-                lut[gray.getpixel((col * TILE_SIZE + x, row * TILE_SIZE + y))]
+                lut[gray.getpixel((col * TILE_SIZE + x, image_row * TILE_SIZE + y))]
                 for y in range(TILE_SIZE)
                 for x in range(TILE_SIZE)
             )
@@ -222,7 +234,8 @@ def apply_art(layout: ArtLayout, rom: bytearray, image: Image.Image) -> int:
         tile_ids.append(tile_id)
 
     for cell, index in enumerate(cells):
-        writes.append((layout.tilemap_offset + cell, bytes([tile_ids[index]])))
+        offset = layout.tilemap_offset + layout.margin_top * layout.columns + cell
+        writes.append((offset, bytes([tile_ids[index]])))
 
     copy_list = bytearray()
     for length, src, dst in records:

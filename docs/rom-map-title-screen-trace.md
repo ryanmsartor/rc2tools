@@ -31,7 +31,7 @@ The stream at `0x7C30` is a single record, `12 14 00 98`: 18 rows × 20 columns 
 
 Verification: the parsed grid matched live VRAM at frame 90 in all 360 cells (0 mismatches). `parse_tilestream.py` and `verify_tilemap.py` produce this check.
 
-The top 13 rows form the art above the START/CONTINUE line, and this matches `TITLE_GRID` in [art_layout.py](../bin/art_layout.py). Rows 13–17 hold the menu text. Tile `0xD3` (copyright) sits in row 16, and the cursor is sprite 0 (tile `0xD4`), which is not in the tilemap. Tile `0x30` is blank filler, and `0x5A` is the most frequent tile.
+The top 13 rows form the grid above the START/CONTINUE line. Rows 0 and 12 are blank `0x30` filler and are kept as a margin, so the editable art is rows 1–11 (160×88 pixels). This matches `ART_LAYOUTS["title"]` in [art_layout.py](../bin/art_layout.py). Rows 13–17 hold the menu text. Tile `0xD3` (copyright) sits in row 16, and the cursor is sprite 0 (tile `0xD4`), which is not in the tilemap. Tile `0x30` is blank filler, and `0x5A` is the most frequent tile.
 
 ## Call-order trace (verified hook timing)
 
@@ -175,15 +175,17 @@ The source-swap, single-cell, and capacity tests above confirm the first two poi
 - **Shared tile:** the cursor sprite uses tile `0xD4`, the same bytes as BG tile `0xD4`, so changing that slot also changes the cursor.
 - **Free space:** a read-only scan (`scratch/rom-trace/free_space_scan.py`) found no large free area. The usable `0xFF` runs are file `0x0061`–`0x00FF` in bank 0 (159 bytes, interrupt-vector area, about 9 tiles), `0x3FC6`–`0x3FFE` in bank 0 (57 bytes, about 3 tiles), and `0x1BF80`–`0x1BFFF` in bank 6 (128 bytes, about 8 tiles). That is about 20 tiles in total. Each `0xFF` run may still be real solid-colour tile data, so these are not proven unused.
 
-## Art capacity and read-art layout
+## Art capacity and inject-art layout
 
 The title's screen wipe repeats about every 697 frames. Frames 0–353 are the wipe-in, and the first static window on the stock ROM is frames 354–736 (the second is 1051–1433). `scratch/rom-trace/wipe_scan.py` finds these windows. Comparisons against the original screen must use a frame inside a static window. Frame 500 is used below. The frame-300 results in the sections above were captured mid-wipe, so treat them as evidence about loader logic only, not as screen comparisons.
 
 The tilemap grid is 13 rows × 20 columns at file `0x13C34`. The first cell is BG `(0,0)`, and each row is written to BG rows 0–12. Row 13 starts at `0x13D38`, which is the menu text. An earlier version used `0x13C36` and shifted the art two cells right. It also wrote into row 13, which changed the menu glyphs.
 
+Rows 0 and 12 are all `0x30` in the stock ROM. `dump-art` and `inject-art` treat them as a margin: the image is rows 1–11 (20 × 11 cells, 160×88 pixels), and `inject-art` never writes the margin tilemap bytes. This keeps a blank border and leaves 220 cells to edit, not 260.
+
 Tile ID `0x3E` is a menu glyph used in rows 13–17, and `0x30` is blank filler. `0xD3` is the copyright tile, and `0xD4` is the menu cursor, which is shared with the logo. These four keep their stock bytes, and the in-place pool is `0x31`–`0x3D`, `0x3F`–`0x7F`, and `0x80`–`0xD2`. That gives 161 IDs.
 
-`rc2t hack read-art title` quantizes the PNG to four shades, using the same four colour indices as the title palette `BGP 0x2D`. The PNG then uses 175 unique 8×8 tiles: 161 rewritten in place, and 14 extras at IDs `0xD5`–`0xE2` (VRAM `0x8D50`–`0x8EFF`). The copy list is 6 bytes per record, plus a zero terminator, which makes 98 bytes at bank 0 file `0x61`. Pointer word 5 (`0x1800A`) is repointed to it. Extra tiles go in free `0xFF` runs. Those runs are bank 0 `0x3FC6`–`0x3FFE` (3 storage slots) and bank 6 `0x1BF80`–`0x1BFFF` (8 slots). The copy list is placed in the bank 0 run at `0x61`, which is the choice that leaves the most 16-byte slots free.
+`rc2t hack inject-art title` quantizes the PNG to four shades, using the same four colour indices as the title palette `BGP 0x2D`. The PNG then uses 175 unique 8×8 tiles: 161 rewritten in place, and 14 extras at IDs `0xD5`–`0xE2` (VRAM `0x8D50`–`0x8EFF`). The copy list is 6 bytes per record, plus a zero terminator, which makes 98 bytes at bank 0 file `0x61`. Pointer word 5 (`0x1800A`) is repointed to it. Extra tiles go in free `0xFF` runs. Those runs are bank 0 `0x3FC6`–`0x3FFE` (3 storage slots) and bank 6 `0x1BF80`–`0x1BFFF` (8 slots). The copy list is placed in the bank 0 run at `0x61`, which is the choice that leaves the most 16-byte slots free.
 
 Verification at frame 500: the rendered grid matches the quantized PNG, VRAM matches the copy list, and screen rows 104+ match the original screen. A pixel check of the whole screen against the PNG is not valid, because the title palette changes by band (STAT handler at `0x594`). Capacity is exact: 175 unique tiles fit, and 176 raises `ValueError`.
 

@@ -24,7 +24,7 @@ rc2t_print_help_message() {
     echo "    finalize                          Copy the in-progress hack to output/ with an IPS patch"
     echo "    swap-char-sprite <char1> <char2>  Swap two characters' sprites and POW portraits"
     echo "    dump-art <name>                   Export named art (title) to working/<name>-art.png"
-    echo "    read-art <name>                   Apply working/<name>-art.png to the in-progress hack"
+    echo "    inject-art <name>                 Apply working/<name>-art.png to the in-progress hack"
 }
 
 _check_if_rom_exists() {
