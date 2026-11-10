@@ -13,6 +13,7 @@ rc2t_print_help_message() {
     echo "  extract-json         [rom-or-hex]  Extract character stats into output/<rom-sha256>.json"
     echo "  render-graphics | rg [start [end [WxH|output]]] [options]  Render ROM tiles (default: entire ROM)"
     echo "    --highlight-known  Shade documented graphics in blue, text in yellow, lookup or stat tables in green, and tilemaps, tables, and routines in purple"
+    echo "    --compare          Compare input/ with the working hack; same bytes are green, different bytes grayscale"
     echo "    --stacked-glyphs   Render 16-byte tiles as two stacked 1bpp glyphs"
     echo "  render-text | rt     Decode the entire ROM into output/rom-text.txt as one string"
     echo "  dump-text [rom-or-hex [output]]  Dump documented text ranges into output/known-text.txt"

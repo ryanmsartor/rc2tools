@@ -213,6 +213,15 @@ with set bits as background and clear bits as black ink:
 
 Stacked-glyph mode cannot be combined with `--tile-grid` or `--mode`.
 
+Use `--compare` to render the selected range from the input ROM and the
+in-progress working ROM side by side, input on the left and working on the
+right. Each panel has its own address axes. Bytes identical between the ROMs
+are highlighted in bluescale; different bytes are highlighted in redscale.
+This option
+requires an existing `working/Rolan's Curse II (USA) (hack in progress).gb`
+and cannot be combined with `--highlight-known`. Other render options, such as
+`--mode`, `--tile-grid`, `--columns`, and `--scale`, still apply to both panels.
+
 The default sprite sheet uses 16 sprites per row. Its grayscale palette
 displays transparent color index 0 as black, while the inverted
 non-transparent palette displays index 3 as white. Empty cells, such as the

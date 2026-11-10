@@ -31,6 +31,13 @@ BLUESCALE_PALETTE = (
     (96, 96, 224),
     (192, 192, 255),
 )
+# Changed pixels use the same shade progression in red.
+REDSCALE_PALETTE = (
+    (96, 0, 0),
+    (160, 0, 0),
+    (224, 96, 96),
+    (255, 192, 192),
+)
 # Known text pixels use the same scheme in yellow.
 YELLOWSCALE_PALETTE = (
     (96, 96, 0),
@@ -185,7 +192,28 @@ def pixel_highlight_palette(
     else:
         owner = None
     return HIGHLIGHT_PALETTES[owner] if owner else None
+
+
+def pixel_compare_color(
+    color: int,
+    palette: tuple[tuple[int, int, int], ...],
+    same_low: bool,
+    same_high: bool,
+    low_set: bool,
+    high_set: bool,
+) -> tuple[int, int, int]:
+    """Shade unchanged byte contributions blue and changed ones red."""
+    if same_low and same_high:
+        return BLUESCALE_PALETTE[color]
+    if same_low and low_set and not high_set:
+        return BLUESCALE_PALETTE[color]
+    if same_high and high_set and not low_set:
+        return BLUESCALE_PALETTE[color]
+    return REDSCALE_PALETTE[color]
+
+
 DEFAULT_ROM = Path(__file__).resolve().parent.parent / "input" / "Rolan's Curse II (USA).gb"
+WORKING_ROM = Path(__file__).resolve().parent.parent / "working" / "Rolan's Curse II (USA) (hack in progress).gb"
 DEFAULT_PALETTE = (
     (0, 0, 0),
     (85, 85, 85),
@@ -331,6 +359,7 @@ def render_tile_grid(
     start_address: int | None = None,
     tile_positions: tuple[tuple[int, int], ...] | None = None,
     highlight_known: bool = False,
+    comparison: bytes | None = None,
 ) -> Image.Image:
     """Render tiles grouped into fixed-size images, in row-major order by default."""
     if tile_columns < 1 or tile_rows < 1:
@@ -343,6 +372,8 @@ def render_tile_grid(
         raise ValueError("palette must contain exactly four colors")
     if highlight_known and start_address is None:
         raise ValueError("start address is required to highlight known graphics")
+    if comparison is not None and len(comparison) != len(data):
+        raise ValueError("comparison data must have the same length as the rendered data")
 
     tiles = decode_tiles(data)
     tiles_per_image = tile_columns * tile_rows
@@ -387,6 +418,13 @@ def render_tile_grid(
             if tile_index * TILE_BYTES + y * 2 >= len(data):
                 break
             low_byte, high_byte = tile_data[y * 2:y * 2 + 2]
+            row_offset = tile_index * TILE_BYTES + y * 2
+            same_low = comparison is not None and data[row_offset] == comparison[row_offset]
+            same_high = (
+                comparison is not None
+                and row_offset + 1 < len(data)
+                and data[row_offset + 1] == comparison[row_offset + 1]
+            )
             row_address = tile_start + y * 2
             low_kind = known_kind(row_address) if highlight_known else None
             high_kind = known_kind(row_address + 1) if highlight_known else None
@@ -398,7 +436,18 @@ def render_tile_grid(
                     bool(low_byte & bit_mask),
                     bool(high_byte & bit_mask),
                 )
-                pixels[tile_x + x, tile_y + y] = shades[color] if shades else palette[color]
+                if comparison is not None:
+                    pixel_color = pixel_compare_color(
+                        color,
+                        palette,
+                        same_low,
+                        same_high,
+                        bool(low_byte & bit_mask),
+                        bool(high_byte & bit_mask),
+                    )
+                else:
+                    pixel_color = shades[color] if shades else palette[color]
+                pixels[tile_x + x, tile_y + y] = pixel_color
 
     if scale > 1:
         image = image.resize((image.width * scale, image.height * scale), Image.Resampling.NEAREST)
@@ -423,6 +472,7 @@ def render_sprites(
     palette: tuple[tuple[int, int, int], ...] = DEFAULT_PALETTE,
     start_address: int | None = None,
     highlight_known: bool = False,
+    comparison: bytes | None = None,
 ) -> Image.Image:
     """Render groups of four column-first tiles as 16x16 sprites."""
     return render_tile_grid(
@@ -435,6 +485,7 @@ def render_sprites(
         start_address,
         tile_positions=SPRITE_TILE_POSITIONS,
         highlight_known=highlight_known,
+        comparison=comparison,
     )
 
 
@@ -445,6 +496,7 @@ def render_portraits(
     palette: tuple[tuple[int, int, int], ...] = PORTRAIT_PALETTE,
     start_address: int | None = None,
     highlight_known: bool = False,
+    comparison: bytes | None = None,
 ) -> Image.Image:
     """Render complete 32x32 portraits from row-major 4x4 tile blocks."""
     if len(data) % PORTRAIT_BYTES:
@@ -458,6 +510,7 @@ def render_portraits(
         palette,
         start_address,
         highlight_known=highlight_known,
+        comparison=comparison,
     )
 
 
@@ -468,6 +521,7 @@ def render_stacked_glyphs(
     palette: tuple[tuple[int, int, int], ...] = DEFAULT_PALETTE,
     start_address: int | None = None,
     highlight_known: bool = False,
+    comparison: bytes | None = None,
 ) -> Image.Image:
     """Render each 16-byte tile as two stacked 8x8 1bpp glyphs (bit 0 is ink)."""
     if columns < 1:
@@ -478,6 +532,8 @@ def render_stacked_glyphs(
         raise ValueError("palette must contain exactly four colors")
     if highlight_known and start_address is None:
         raise ValueError("start address is required to highlight known graphics")
+    if comparison is not None and len(comparison) != len(data):
+        raise ValueError("comparison data must have the same length as the rendered data")
 
     tile_count = math.ceil(len(data) / TILE_BYTES)
     cell_height = TILE_BYTES
@@ -499,13 +555,21 @@ def render_stacked_glyphs(
         tile_y = (tile_index // columns) * (cell_height + SPRITE_GUTTER)
         tile_data = data[tile_index * TILE_BYTES:(tile_index + 1) * TILE_BYTES]
         for y, row_byte in enumerate(tile_data):
+            row_offset = tile_index * TILE_BYTES + y
             row_address = (
-                start_address + tile_index * TILE_BYTES + y if start_address is not None else None
+                start_address + row_offset if start_address is not None else None
             )
             row_kind = known_kind(row_address) if highlight_known else None
+            same = comparison is not None and row_byte == comparison[row_offset]
             for x in range(TILE_WIDTH):
                 ink = row_byte & (1 << (7 - x))
-                if row_kind:
+                if same:
+                    shades = BLUESCALE_PALETTE
+                    color = shades[3] if ink else shades[0]
+                elif comparison is not None:
+                    shades = REDSCALE_PALETTE
+                    color = shades[3] if ink else shades[0]
+                elif row_kind:
                     shades = HIGHLIGHT_PALETTES[row_kind]
                     color = shades[3] if ink else shades[0]
                 elif ink:
@@ -536,11 +600,14 @@ def render_banked_sprites(
     columns: int = 16,
     scale: int = 4,
     highlight_known: bool = False,
+    comparison: bytes | None = None,
 ) -> Image.Image:
     """Render sprites with one labeled block per 16 KiB ROM bank, separated by rules.
 
     Each bank is rendered on its own, so it starts a new row and gets its own address labels.
     """
+    if comparison is not None and len(comparison) != len(data):
+        raise ValueError("comparison data must have the same length as the rendered data")
     blocks = []
     address = start_address
     end_address = start_address + len(data)
@@ -553,6 +620,10 @@ def render_banked_sprites(
             scale,
             start_address=address,
             highlight_known=highlight_known,
+            comparison=(
+                comparison[address - start_address:block_end - start_address]
+                if comparison is not None else None
+            ),
         )
         blocks.append((f"Bank {bank}", block))
         address = block_end
@@ -587,6 +658,88 @@ def render_banked_sprites(
     return output
 
 
+def render_range(
+    data: bytes,
+    start_address: int,
+    *,
+    mode: str,
+    tile_grid: tuple[int, int] | None,
+    stacked_glyphs: bool,
+    columns: int | None,
+    scale: int,
+    highlight_known: bool,
+    comparison: bytes | None = None,
+) -> Image.Image:
+    if stacked_glyphs:
+        if tile_grid is not None or mode != "sprites":
+            raise ValueError("--stacked-glyphs cannot be combined with --tile-grid or --mode")
+        return render_stacked_glyphs(
+            data,
+            columns if columns is not None else 16,
+            scale,
+            start_address=start_address,
+            highlight_known=highlight_known,
+            comparison=comparison,
+        )
+    if tile_grid is not None:
+        tile_columns, tile_rows = tile_grid
+        palette = PORTRAIT_PALETTE if mode == "portraits" else DEFAULT_PALETTE
+        return render_tile_grid(
+            data,
+            tile_columns,
+            tile_rows,
+            columns if columns is not None else 4,
+            scale,
+            palette,
+            start_address,
+            highlight_known=highlight_known,
+            comparison=comparison,
+        )
+    if mode == "portraits":
+        return render_portraits(
+            data,
+            columns if columns is not None else 4,
+            scale,
+            start_address=start_address,
+            highlight_known=highlight_known,
+            comparison=comparison,
+        )
+    return render_banked_sprites(
+        data,
+        start_address,
+        columns if columns is not None else 16,
+        scale,
+        highlight_known=highlight_known,
+        comparison=comparison,
+    )
+
+
+def combine_comparison_images(input_image: Image.Image, working_image: Image.Image) -> Image.Image:
+    font = ImageFont.load_default()
+    _, label_top, _, label_bottom = font.getbbox("Input ROM")
+    label_height = label_bottom - label_top
+    header_height = label_height + 12
+    gap = 24
+    width = input_image.width + gap + working_image.width
+    height = header_height + max(input_image.height, working_image.height)
+    combined = Image.new("RGB", (width, height), (255, 255, 255))
+    draw = ImageDraw.Draw(combined)
+    for label, x, image in (
+        ("Input ROM", 0, input_image),
+        ("Working ROM", input_image.width + gap, working_image),
+    ):
+        draw.text(
+            (x + 4, (header_height - label_height) // 2 - label_top),
+            label,
+            fill=(0, 0, 0),
+            font=font,
+        )
+        combined.paste(image, (x, header_height))
+    divider_x = input_image.width + gap // 2
+    draw.line((divider_x, 0, divider_x, height - 1), fill=(192, 192, 192))
+    return combined
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("start", type=parse_offset, help="start ROM offset (inclusive)")
@@ -610,10 +763,16 @@ def main() -> int:
         metavar="WIDTHxHEIGHT",
         help="combine this many tiles across and down into each image",
     )
-    parser.add_argument(
+    highlight_options = parser.add_mutually_exclusive_group()
+    highlight_options.add_argument(
         "--highlight-known",
         action="store_true",
         help="shade pixels in documented graphics in blue, text in yellow, lookup or stat tables in green, and tilemaps, tables, and routines in purple",
+    )
+    highlight_options.add_argument(
+        "--compare",
+        action="store_true",
+        help=f"compare the input ROM with {WORKING_ROM}",
     )
     parser.add_argument(
         "--stacked-glyphs",
@@ -639,47 +798,47 @@ def main() -> int:
         if args.end > len(rom):
             raise ValueError(f"range end 0x{args.end:X} exceeds ROM size 0x{len(rom):X}")
         data = rom[args.start:args.end]
-        if args.stacked_glyphs:
-            if args.tile_grid is not None or args.mode != "sprites":
-                raise ValueError("--stacked-glyphs cannot be combined with --tile-grid or --mode")
-            columns = args.columns if args.columns is not None else 16
-            image = render_stacked_glyphs(
+        if args.compare:
+            if not WORKING_ROM.is_file():
+                raise ValueError(f"--compare requires the working ROM at {WORKING_ROM}")
+            working_rom = read_rom(WORKING_ROM)
+            if args.end > len(working_rom):
+                raise ValueError(
+                    f"range end 0x{args.end:X} exceeds working ROM size 0x{len(working_rom):X}"
+                )
+            working_data = working_rom[args.start:args.end]
+            input_image = render_range(
                 data,
-                columns,
-                args.scale,
-                start_address=args.start,
-                highlight_known=args.highlight_known,
-            )
-        elif args.tile_grid is not None:
-            tile_columns, tile_rows = args.tile_grid
-            columns = args.columns if args.columns is not None else 4
-            palette = PORTRAIT_PALETTE if args.mode == "portraits" else DEFAULT_PALETTE
-            image = render_tile_grid(
-                data,
-                tile_columns,
-                tile_rows,
-                columns,
-                args.scale,
-                palette,
                 args.start,
+                mode=args.mode,
+                tile_grid=args.tile_grid,
+                stacked_glyphs=args.stacked_glyphs,
+                columns=args.columns,
+                scale=args.scale,
                 highlight_known=args.highlight_known,
+                comparison=working_data,
             )
-        elif args.mode == "portraits":
-            columns = args.columns if args.columns is not None else 4
-            image = render_portraits(
-                data,
-                columns,
-                args.scale,
-                start_address=args.start,
+            working_image = render_range(
+                working_data,
+                args.start,
+                mode=args.mode,
+                tile_grid=args.tile_grid,
+                stacked_glyphs=args.stacked_glyphs,
+                columns=args.columns,
+                scale=args.scale,
                 highlight_known=args.highlight_known,
+                comparison=data,
             )
+            image = combine_comparison_images(input_image, working_image)
         else:
-            columns = args.columns if args.columns is not None else 16
-            image = render_banked_sprites(
+            image = render_range(
                 data,
                 args.start,
-                columns,
-                args.scale,
+                mode=args.mode,
+                tile_grid=args.tile_grid,
+                stacked_glyphs=args.stacked_glyphs,
+                columns=args.columns,
+                scale=args.scale,
                 highlight_known=args.highlight_known,
             )
         args.output.parent.mkdir(parents=True, exist_ok=True)

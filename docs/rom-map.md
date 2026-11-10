@@ -579,7 +579,65 @@ This is a coarse range, not a map. Individual tile and sprite boundaries, how th
 
 ### NPC, enemy, and orb sprites (preliminary)
 
-The range `0xE25A-0xFD59` (6,912 bytes, exactly 432 16-byte 2bpp tiles) contains NPC and enemy sprites, arranged as 16×16 sprites of four tiles each. The rendered sample shows character-like and creature-like artwork rather than code or text. It is included in `--highlight-known`.
+The range `0xE25A-0xFD59` (6,912 bytes, exactly 432 16-byte 2bpp tiles) contains NPC and enemy sprites. The first 56 16×16 sprites are listed below as 28 two-frame animations. This identification is based on the rendered artwork; names marked `(?)` are tentative.
+
+| NPC or enemy | Frame 1 | Frame 2 |
+|---|---|---|
+| Egghead | `0xE25A-0xE299` | `0xE29A-0xE2D9` |
+| Dog | `0xE2DA-0xE319` | `0xE31A-0xE359` |
+| Kyle | `0xE35A-0xE399` | `0xE39A-0xE3D9` |
+| Skull sorceror (?) | `0xE3DA-0xE419` | `0xE41A-0xE459` |
+| Jude | `0xE45A-0xE499` | `0xE49A-0xE4D9` |
+| Jude's pupil | `0xE4DA-0xE519` | `0xE51A-0xE559` |
+| Lora | `0xE55A-0xE599` | `0xE59A-0xE5D9` |
+| Zold | `0xE5DA-0xE619` | `0xE61A-0xE659` |
+| Dark knight (?) | `0xE65A-0xE699` | `0xE69A-0xE6D9` |
+| White blob | `0xE6DA-0xE719` | `0xE71A-0xE759` |
+| Spiny beetle | `0xE75A-0xE799` | `0xE79A-0xE7D9` |
+| Medusa head | `0xE7DA-0xE819` | `0xE81A-0xE859` |
+| Carnivorous plant | `0xE85A-0xE899` | `0xE89A-0xE8D9` |
+| Demon head | `0xE8DA-0xE919` | `0xE91A-0xE959` |
+| Knight armor head | `0xE95A-0xE999` | `0xE99A-0xE9D9` |
+| Nautilus | `0xE9DA-0xEA19` | `0xEA1A-0xEA59` |
+| Ghost | `0xEA5A-0xEA99` | `0xEA9A-0xEAD9` |
+| Mosquito | `0xEADA-0xEB19` | `0xEB1A-0xEB59` |
+| Flying book | `0xEB5A-0xEB99` | `0xEB9A-0xEBD9` |
+| Zombie | `0xEBDA-0xEC19` | `0xEC1A-0xEC59` |
+| Wood head | `0xEC5A-0xEC99` | `0xEC9A-0xECD9` |
+| Worm blob | `0xECDA-0xED19` | `0xED1A-0xED59` |
+| Living jar (?) | `0xED5A-0xED99` | `0xED9A-0xEDD9` |
+| Ghost | `0xEDDA-0xEE19` | `0xEE1A-0xEE59` |
+| Magic carp | `0xEE5A-0xEE99` | `0xEE9A-0xEED9` |
+| Blowfish | `0xEEDA-0xEF19` | `0xEF1A-0xEF59` |
+| Crow | `0xEF5A-0xEF99` | `0xEF9A-0xEFD9` |
+| Steer skull | `0xEFDA-0xF019` | `0xF01A-0xF059` |
+
+Each frame is a 2×2 sprite (64 bytes); the two sprites in each row form a simple two-frame animation. This accounts for `0xE25A-0xF059`.
+
+The next seven NPC/enemy sets each contain four 2×2 sprite poses: downward walking, upward walking, leftward standing, and leftward stepping.
+
+| NPC or enemy | Downward walking | Upward walking | Leftward standing | Leftward stepping |
+|---|---|---|---|---|
+| Shadow man | `0xF05A-0xF099` | `0xF09A-0xF0D9` | `0xF0DA-0xF119` | `0xF11A-0xF159` |
+| Sorceror | `0xF15A-0xF199` | `0xF19A-0xF1D9` | `0xF1DA-0xF219` | `0xF21A-0xF259` |
+| Monkey | `0xF25A-0xF299` | `0xF29A-0xF2D9` | `0xF2DA-0xF319` | `0xF31A-0xF359` |
+| Evil knight | `0xF35A-0xF399` | `0xF39A-0xF3D9` | `0xF3DA-0xF419` | `0xF41A-0xF459` |
+| Monster duck | `0xF45A-0xF499` | `0xF49A-0xF4D9` | `0xF4DA-0xF519` | `0xF51A-0xF559` |
+| Mushroom head | `0xF55A-0xF599` | `0xF59A-0xF5D9` | `0xF5DA-0xF619` | `0xF61A-0xF659` |
+| Walking frog | `0xF65A-0xF699` | `0xF69A-0xF6D9` | `0xF6DA-0xF719` | `0xF71A-0xF759` |
+
+These four-pose sets occupy `0xF05A-0xF759`; the next address is `0xF75A`.
+
+The next four characters have six 2×2 sprite poses each, in the order of two walking-down frames, two walking-up frames, and two walking-left frames. Names marked `(?)` are tentative.
+
+| NPC or enemy | Down 1 | Down 2 | Up 1 | Up 2 | Left 1 | Left 2 |
+|---|---|---|---|---|---|---|
+| Lizard soldier | `0xF75A-0xF799` | `0xF79A-0xF7D9` | `0xF7DA-0xF819` | `0xF81A-0xF859` | `0xF85A-0xF899` | `0xF89A-0xF8D9` |
+| Rhino soldier (?) | `0xF8DA-0xF919` | `0xF91A-0xF959` | `0xF95A-0xF999` | `0xF99A-0xF9D9` | `0xF9DA-0xFA19` | `0xFA1A-0xFA59` |
+| Ninja (?) | `0xFA5A-0xFA99` | `0xFA9A-0xFAD9` | `0xFADA-0xFB19` | `0xFB1A-0xFB59` | `0xFB5A-0xFB99` | `0xFB9A-0xFBD9` |
+| Cyclops wizard (?) | `0xFBDA-0xFC19` | `0xFC1A-0xFC59` | `0xFC5A-0xFC99` | `0xFC9A-0xFCD9` | `0xFCDA-0xFD19` | `0xFD1A-0xFD59` |
+
+These six-pose sets occupy `0xF75A-0xFD59`; the next address is `0xFD5A`. Together, the two-frame, four-pose, and six-pose entries above account for the 2×2 sprite artwork from `0xE25A` through `0xFD59`.
 
 The last two tiles of the artwork are a light and a dark energy orb, 1×1 tiles each:
 
@@ -590,7 +648,7 @@ The last two tiles of the artwork are a light and a dark energy orb, 1×1 tiles 
 
 The bytes from `0xFD7A` onward do not look like 2bpp artwork. They repeat 4-byte groups, such as `34 00 08 00`, `35 00 00 08`, and `36 00 08 08`. The second byte of each group is often `0x00` or `0x20`, and tile numbers climb through runs such as `0x34-0x37` and `0x28-0x2B`. This pattern fits sprite-part records (position offsets, tile number, and attributes) that would assemble multi-tile sprites, but this is unconfirmed. The records are not in `--highlight-known` yet, and the end of this data has not been found.
 
-Individual sprite boundaries, which NPC or enemy each sprite belongs to, the record format, and the routines or tables that reference them have not been traced. Go back and map this range more thoroughly later.
+The routines or tables that reference these sprites have not been traced.
 
 ### Chest, junk, house, and terrain tiles (preliminary)
 
@@ -607,9 +665,18 @@ The chest and junk are described from the user's observation and matched against
 
 ### Idle NPC sprites (preliminary)
 
-The range `0x1861E-0x18A1D` (1,024 bytes, 16 2×2 sprites of 64 bytes each) holds two idle-animation frames for each of eight townsfolk, in this order: elder, egghead, man, woman, child, dog, chicken, and frog. Each NPC's two frames are consecutive 64-byte sprites: the elder is at `0x1861E` and `0x1865E`, the egghead at `0x1869E` and `0x186DE`, and so on through the frog at `0x1899E` and `0x189DE`.
+The range `0x1861E-0x18A1D` (1,024 bytes, 16 2×2 sprites of 64 bytes each) appears to hold two idle-animation frames for each of eight townsfolk. The frame pairing is inferred from the bytes: adjacent frames differ by 41 to 108 bits, while frames 8 sprites apart differ by 154 to 189. The NPC identities come from observation; the rendered sprites have not yet been checked against them.
 
-The pairing is inferred from the bytes. Adjacent frames differ by 41 to 108 bits, while frames 8 sprites apart differ by 154 to 189. The NPC identities come from the user's observation, and the rendered sprites are not checked against them.
+| NPC (tentative) | Frame 1 | Frame 2 |
+|---|---:|---:|
+| Elder | `0x1861E-0x1865D` | `0x1865E-0x1869D` |
+| Egghead | `0x1869E-0x186DD` | `0x186DE-0x1871D` |
+| Man | `0x1871E-0x1875D` | `0x1875E-0x1879D` |
+| Woman | `0x1879E-0x187DD` | `0x187DE-0x1881D` |
+| Child | `0x1881E-0x1885D` | `0x1885E-0x1889D` |
+| Dog | `0x1889E-0x188DD` | `0x188DE-0x1891D` |
+| Chicken | `0x1891E-0x1895D` | `0x1895E-0x1899D` |
+| Frog | `0x1899E-0x189DD` | `0x189DE-0x18A1D` |
 
 ### Boss sprites (tentative)
 

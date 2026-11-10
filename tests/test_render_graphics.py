@@ -57,6 +57,70 @@ def color_counts(image):
 
 
 class RenderGraphicsTests(unittest.TestCase):
+    def test_compare_shades_matching_bytes_blue_and_changed_bytes_red(self):
+        data = bytes([0xC0, 0x00]) + bytes(14)
+        comparison = bytes([0xC0, 0x80]) + bytes(14)
+        image = render_graphics.render_tile_grid(
+            data, 1, 1, columns=1, scale=1, comparison=comparison
+        )
+        self.assertEqual(image.getpixel((0, 0)), render_graphics.BLUESCALE_PALETTE[1])
+        self.assertEqual(image.getpixel((1, 0)), render_graphics.BLUESCALE_PALETTE[1])
+        self.assertEqual(image.getpixel((2, 0)), render_graphics.REDSCALE_PALETTE[0])
+
+        working_image = render_graphics.render_tile_grid(
+            comparison, 1, 1, columns=1, scale=1, comparison=data
+        )
+        self.assertEqual(working_image.getpixel((0, 0)), render_graphics.REDSCALE_PALETTE[3])
+        self.assertEqual(working_image.getpixel((1, 0)), render_graphics.BLUESCALE_PALETTE[1])
+
+        same = render_graphics.render_tile_grid(
+            data, 1, 1, columns=1, scale=1, comparison=data
+        )
+        self.assertEqual(same.getpixel((0, 0)), render_graphics.BLUESCALE_PALETTE[1])
+        self.assertEqual(same.getpixel((2, 0)), render_graphics.BLUESCALE_PALETTE[0])
+
+    def test_compare_requires_equal_range_lengths(self):
+        with self.assertRaisesRegex(ValueError, "same length"):
+            render_graphics.render_tile_grid(
+                bytes(16), 1, 1, comparison=bytes(15)
+            )
+
+    def test_compare_glyphs_shade_matching_bytes_blue(self):
+        data = bytes([0x80]) + bytes(15)
+        comparison = bytes([0x80]) + bytes([0x01]) + bytes(14)
+        image = render_graphics.render_stacked_glyphs(
+            data, columns=1, scale=1, comparison=comparison
+        )
+        self.assertEqual(image.getpixel((0, 0)), render_graphics.BLUESCALE_PALETTE[3])
+        self.assertEqual(image.getpixel((1, 0)), render_graphics.BLUESCALE_PALETTE[0])
+        self.assertEqual(image.getpixel((7, 1)), render_graphics.REDSCALE_PALETTE[0])
+
+    def test_comparison_composes_labeled_panels_with_independent_axes(self):
+        base = bytes([0xFF, 0]) * 8
+        working = bytes([0x7F, 0]) * 8
+        base_panel = render_graphics.render_sprites(
+            base, columns=1, scale=1, start_address=0x1000, comparison=working
+        )
+        working_panel = render_graphics.render_sprites(
+            working, columns=1, scale=1, start_address=0x1000, comparison=base
+        )
+        combined = render_graphics.combine_comparison_images(base_panel, working_panel)
+        font = render_graphics.ImageFont.load_default()
+        header_height = font.getbbox("Input ROM")[3] - font.getbbox("Input ROM")[1] + 12
+        gap = 24
+        self.assertEqual(combined.size, (base_panel.width + gap + working_panel.width,
+                                         header_height + max(base_panel.height, working_panel.height)))
+        self.assertEqual(
+            combined.crop((0, header_height, base_panel.width, header_height + base_panel.height)).tobytes(),
+            base_panel.tobytes(),
+        )
+        self.assertEqual(
+            combined.crop((base_panel.width + gap, header_height,
+                           base_panel.width + gap + working_panel.width,
+                           header_height + working_panel.height)).tobytes(),
+            working_panel.tobytes(),
+        )
+
     def test_parses_tile_grid_dimensions(self):
         self.assertEqual(render_graphics.parse_tile_grid("2x3"), (2, 3))
         self.assertEqual(render_graphics.parse_tile_grid("1X2"), (1, 2))
