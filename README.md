@@ -245,12 +245,21 @@ or `--help`, to see its commands.
 ./rc2t hack reset     # delete the in-progress copy and replace it with a fresh copy of input/
 ./rc2t hack clear     # delete the in-progress copy
 ./rc2t hack finalize  # copy the in-progress copy to output/ and write an IPS patch
+./rc2h finalize "my hack"  # use a custom parenthetical filename tag
 ./rc2t hack swap-char-sprite hero pit  # edit the in-progress copy in place
 ./rc2t hack dump-art title   # write working/title-art.png from the in-progress copy
 ./rc2h dump-art hero         # write working/hero-art.png from the in-progress copy
 ./rc2h inject-art hero       # apply working/hero-art.png to the in-progress copy
 ./rc2t hack inject-art title   # apply an edited working/title-art.png to the in-progress copy
+./rc2h dump-art all          # export title and all eight characters
+./rc2h inject-art all        # apply all nine art PNGs
 ```
+
+The `all` target processes the title first, then the characters in the order
+listed below. It uses the same files and behavior as each individual command:
+dumping overwrites existing PNGs, and injection records each applied image in
+`hacks.txt`. Processing stops on the first error; earlier dumps or injections
+remain in place.
 
 Character names for `swap-char-sprite` are `hero`, `pit`, `lane`, `kyle`,
 `jude`, `lee`, `lora`, and `zold`. The swap exchanges the nine standard poses,
@@ -291,3 +300,8 @@ and `clear` delete this file, and `swap-char-sprite` and `inject-art` append to 
 `output/Rolan's Curse II (USA) (hack finalized).ips`. The patch is a diff from
 the original `input/` ROM to the finalized ROM, and it replaces any previous
 finalized files. The `working/` directory is ignored by git.
+An optional tag replaces `hack finalized` in both output filenames. For
+example, `./rc2h finalize "my hack"` writes
+`output/Rolan's Curse II (USA) (my hack).gb` and the matching `.ips` file.
+Quote tags containing spaces. Tags must be nonempty and cannot contain path
+separators or control characters; existing files with the same tag are replaced.

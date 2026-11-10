@@ -20,7 +20,7 @@ WORKING_DIR = ROOT / "working"
 WORKING_ROM_PATH = WORKING_DIR / "Rolan's Curse II (USA) (hack in progress).gb"
 HACKS_LOG_PATH = WORKING_DIR / "hacks.txt"
 OUTPUT_DIR = ROOT / "output"
-FINALIZED_STEM = "Rolan's Curse II (USA) (hack finalized)"
+DEFAULT_FINALIZE_TAG = "hack finalized"
 SWAP_SUBCOMMAND = "swap-char-sprite"
 SWAP_ALIAS = "swap-character-sprite"
 IPS_HEADER = b"PATCH"
@@ -125,14 +125,15 @@ def read_art(name: str) -> None:
     print(f"Applied {path} to {WORKING_ROM_PATH}")
 
 
-def finalize_working_copy() -> None:
+def finalize_working_copy(tag: str) -> None:
     original = INPUT_ROM_PATH.read_bytes()
     modified = WORKING_ROM_PATH.read_bytes()
     patch = build_ips_patch(original, modified)
 
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    rom_output = OUTPUT_DIR / f"{FINALIZED_STEM}.gb"
-    patch_output = OUTPUT_DIR / f"{FINALIZED_STEM}.ips"
+    stem = f"{Path(ROM_NAME).stem} ({tag})"
+    rom_output = OUTPUT_DIR / f"{stem}.gb"
+    patch_output = OUTPUT_DIR / f"{stem}.ips"
     rom_output.write_bytes(modified)
     patch_output.write_bytes(patch)
     print(f"Wrote {rom_output}")
@@ -155,7 +156,16 @@ def _add_swap_arguments(parser: argparse.ArgumentParser) -> None:
 
 
 def _add_art_arguments(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument("name", choices=(*ART_LAYOUTS, *CHARACTER_SPRITES), help="named art to use")
+    parser.add_argument(
+        "name", choices=(*ART_LAYOUTS, *CHARACTER_SPRITES, "all"),
+        help="named art to use, or all supported art",
+    )
+
+
+def _finalize_tag(value: str) -> str:
+    if not value.strip() or any(char in value for char in "/\\") or any(ord(char) < 32 for char in value):
+        raise argparse.ArgumentTypeError("tag must be nonempty and contain no path separators or control characters")
+    return value
 
 
 def main() -> int:
@@ -163,9 +173,13 @@ def main() -> int:
     subparsers = parser.add_subparsers(dest="subcommand", required=True, metavar="<subcommand>")
     subparsers.add_parser("clear", help="delete the in-progress hack copy and hacks.txt")
     subparsers.add_parser("reset", help="replace the in-progress hack copy with a fresh copy of the input ROM")
-    subparsers.add_parser(
+    finalize_parser = subparsers.add_parser(
         "finalize",
-        help="copy the in-progress hack into output/ and write an IPS patch against the input ROM",
+        help="copy the in-progress hack into output/ with an IPS patch and optional filename tag",
+    )
+    finalize_parser.add_argument(
+        "tag", nargs="?", default=DEFAULT_FINALIZE_TAG, type=_finalize_tag,
+        help="parenthetical output filename tag (default: hack finalized)",
     )
     swap_parser = subparsers.add_parser(
         SWAP_SUBCOMMAND,
@@ -197,13 +211,15 @@ def main() -> int:
         elif args.subcommand == "reset":
             reset_working_copy()
         elif args.subcommand == "finalize":
-            finalize_working_copy()
+            finalize_working_copy(args.tag)
         elif args.subcommand == SWAP_SUBCOMMAND:
             apply_swap_character_sprite(args.character1, args.character2)
         elif args.subcommand == "dump-art":
-            dump_art(args.name)
+            for name in (*ART_LAYOUTS, *CHARACTER_SPRITES) if args.name == "all" else (args.name,):
+                dump_art(name)
         elif args.subcommand == "inject-art":
-            read_art(args.name)
+            for name in (*ART_LAYOUTS, *CHARACTER_SPRITES) if args.name == "all" else (args.name,):
+                read_art(name)
     except (OSError, ValueError) as error:
         print(f"Error: {error}", file=sys.stderr)
         return 1

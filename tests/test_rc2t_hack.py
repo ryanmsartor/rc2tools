@@ -103,6 +103,41 @@ class HackWrapperTests(unittest.TestCase):
         self.assertIn("Error:", result.stderr)
         self.assertFalse((self.root / "output" / f"{FINALIZED_STEM}.ips").exists())
 
+    def test_finalize_custom_tag_via_rc2h(self):
+        self.run_wrapper("reset")
+        edited = bytearray(self.rom)
+        edited[0x150:0x153] = b"\xAA\xBB\xCC"
+        self.working.write_bytes(edited)
+        result = subprocess.run(
+            [str(self.root / "rc2h"), "finalize", "my hack"],
+            cwd=self.root / "input",
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        stem = "Rolan's Curse II (USA) (my hack)"
+        self.assertEqual((self.root / "output" / f"{stem}.gb").read_bytes(), edited)
+        patch = (self.root / "output" / f"{stem}.ips").read_bytes()
+        self.assertEqual(patch, b"PATCH\x00\x01\x50\x00\x03\xAA\xBB\xCCEOF")
+        self.assertFalse((self.root / "output" / f"{FINALIZED_STEM}.gb").exists())
+        self.assertEqual(self.working.read_bytes(), edited)
+        self.assertEqual(self.hacks_log.read_text(), "")
+
+    def test_finalize_rejects_invalid_tags_before_creating_working_copy(self):
+        for tag in ("", "  ", "../outside", "a\\b", "bad\nname"):
+            with self.subTest(tag=tag):
+                result = self.run_wrapper("finalize", tag)
+                self.assertEqual(result.returncode, 2)
+                self.assertIn("tag must be nonempty", result.stderr)
+                self.assertFalse(self.working.exists())
+                self.assertEqual(list((self.root / "output").iterdir()), [])
+
+    def test_finalize_rejects_multiple_tags(self):
+        result = self.run_wrapper("finalize", "one", "two")
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("unrecognized arguments", result.stderr)
+        self.assertFalse(self.working.exists())
+
     def test_any_subcommand_creates_empty_hacks_log(self):
         self.run_wrapper("finalize")
         self.assertEqual(self.hacks_log.read_text(), "")
@@ -321,6 +356,52 @@ class HackWrapperTests(unittest.TestCase):
                     self.assertEqual(image.getpixel((0, 0)), (shade, shade, shade))
         self.assertEqual(self.working.read_bytes(), bytes(rom))
         self.assertEqual(self.hacks_log.read_text(), "")
+
+    def test_dump_and_inject_all_matches_individual_commands(self):
+        names = ("title", "hero", "pit", "lane", "kyle", "jude", "lee", "lora", "zold")
+        self.use_input_rom(self.build_sprite_rom())
+        self.assertEqual(self.run_wrapper("reset").returncode, 0)
+        before = self.working.read_bytes()
+        result = self.run_wrapper("dump-art", "all")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self.working.read_bytes(), before)
+        self.assertEqual(self.hacks_log.read_text(), "")
+        for name in names:
+            path = self.root / "working" / f"{name}-art.png"
+            with Image.open(path) as image:
+                edited = image.copy()
+            self.assertEqual(edited.size, (160, 88) if name == "title" else (84, 50))
+            if name == "title":
+                edited.putpixel((0, 0), 0 if edited.getpixel((0, 0)) != 0 else 255)
+            else:
+                edited.putpixel((0, 0), (85, 85, 85) if edited.getpixel((0, 0)) != (85, 85, 85) else (255, 255, 255))
+            edited.save(path)
+
+        result = subprocess.run(
+            [str(self.root / "rc2h"), "inject-art", "all"],
+            cwd=self.root / "input", capture_output=True, text=True,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        combined = self.working.read_bytes()
+        expected_log = "".join(f"inject-art {name}\n" for name in names)
+        self.assertEqual(self.hacks_log.read_text(), expected_log)
+        self.assertNotEqual(combined, before)
+
+        self.assertEqual(self.run_wrapper("reset").returncode, 0)
+        for name in names:
+            result = self.run_wrapper("inject-art", name)
+            self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self.working.read_bytes(), combined)
+        self.assertEqual(self.hacks_log.read_text(), expected_log)
+
+    def test_inject_all_stops_at_missing_image_and_keeps_prior_results(self):
+        self.use_input_rom(self.build_sprite_rom())
+        self.assertEqual(self.run_wrapper("dump-art", "all").returncode, 0)
+        (self.root / "working" / "lane-art.png").unlink()
+        result = self.run_wrapper("inject-art", "all")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("lane-art.png", result.stderr)
+        self.assertEqual(self.hacks_log.read_text(), "inject-art title\ninject-art hero\ninject-art pit\n")
 
     def test_inject_each_character_and_log(self):
         starts = {
