@@ -1,2 +1,15 @@
 #!/usr/bin/env bash
+set -o pipefail
+
+if [ "$#" -eq 0 ]; then
+    set -- --help
+fi
+
+case "$1" in
+    h|help|-h|-help|--h|--help)
+        "$(dirname "$0")/rc2t" hack --help | sed '1s/^usage: rc2t hack /usage: rc2h /'
+        exit $?
+        ;;
+esac
+
 exec "$(dirname "$0")/rc2t" hack "$@"

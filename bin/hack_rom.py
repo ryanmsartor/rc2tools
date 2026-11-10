@@ -9,6 +9,7 @@ from pathlib import Path
 from PIL import Image
 
 from art_layout import ART_LAYOUTS, apply_art, render_art
+from character_art import apply_character_art, render_character_art
 from swap_character_sprite import CHARACTER_SPRITES, swap_character_sprites
 
 
@@ -104,7 +105,8 @@ def art_png_path(name: str) -> Path:
 
 
 def dump_art(name: str) -> None:
-    image = render_art(ART_LAYOUTS[name], WORKING_ROM_PATH.read_bytes())
+    rom = WORKING_ROM_PATH.read_bytes()
+    image = render_character_art(rom, name) if name in CHARACTER_SPRITES else render_art(ART_LAYOUTS[name], rom)
     path = art_png_path(name)
     image.save(path)
     print(f"Wrote {path}")
@@ -114,7 +116,10 @@ def read_art(name: str) -> None:
     rom = bytearray(WORKING_ROM_PATH.read_bytes())
     path = art_png_path(name)
     with Image.open(path) as image:
-        apply_art(ART_LAYOUTS[name], rom, image)
+        if name in CHARACTER_SPRITES:
+            apply_character_art(rom, name, image)
+        else:
+            apply_art(ART_LAYOUTS[name], rom, image)
     WORKING_ROM_PATH.write_bytes(rom)
     record_hack(f"inject-art {name}")
     print(f"Applied {path} to {WORKING_ROM_PATH}")
@@ -150,7 +155,7 @@ def _add_swap_arguments(parser: argparse.ArgumentParser) -> None:
 
 
 def _add_art_arguments(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument("name", choices=tuple(ART_LAYOUTS), help="named art to use")
+    parser.add_argument("name", choices=(*ART_LAYOUTS, *CHARACTER_SPRITES), help="named art to use")
 
 
 def main() -> int:

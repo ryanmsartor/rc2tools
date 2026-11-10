@@ -30,7 +30,8 @@ class HackWrapperTests(unittest.TestCase):
         (self.root / "output").mkdir()
         shutil.copy2(ROOT / "rc2t", self.root / "rc2t")
         shutil.copy2(ROOT / "rc2h", self.root / "rc2h")
-        for name in ("hack_rom.py", "swap_character_sprite.py", "art_layout.py"):
+        for name in ("hack_rom.py", "swap_character_sprite.py", "art_layout.py",
+                     "character_art.py", "render_graphics.py", "extract_json.py"):
             shutil.copy2(ROOT / "bin" / name, self.root / "bin" / name)
         self.rom = bytes(range(256)) * 0x200
         (self.root / "input" / ROM_NAME).write_bytes(self.rom)
@@ -228,7 +229,7 @@ class HackWrapperTests(unittest.TestCase):
         self.assertIn("usage", result.stderr)
 
     def test_rc2h_forwards_arguments_and_exit_status(self):
-        for args in (("--help",), ("dump-art", "not a title"), ()):
+        for args in (("",), ("dump-art", "not a title"), ("dump-art", "--help"), ("bogus",)):
             with self.subTest(args=args):
                 expected = self.run_wrapper(*args)
                 result = subprocess.run(
@@ -240,6 +241,23 @@ class HackWrapperTests(unittest.TestCase):
                 self.assertEqual(result.returncode, expected.returncode)
                 self.assertEqual(result.stdout, expected.stdout)
                 self.assertEqual(result.stderr, expected.stderr)
+
+    def test_rc2h_help_aliases(self):
+        expected = self.run_wrapper("--help")
+        self.assertEqual(expected.returncode, 0)
+        help_text = expected.stdout.replace("usage: rc2t hack ", "usage: rc2h ", 1)
+        for args in ((), ("h",), ("help",), ("-h",), ("-help",), ("--h",), ("--help",)):
+            with self.subTest(args=args):
+                result = subprocess.run(
+                    [str(self.root / "rc2h"), *args],
+                    cwd=self.root / "input",
+                    capture_output=True,
+                    text=True,
+                )
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(result.stdout, help_text)
+                self.assertEqual(result.stderr, "")
+                self.assertFalse(self.working.exists())
 
     def test_rc2h_runs_hack_subcommand(self):
         result = subprocess.run(
@@ -258,6 +276,90 @@ class HackWrapperTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         with Image.open(self.root / "working" / "title-art.png") as image:
             self.assertEqual(image.size, (160, 88))
+        self.assertEqual(self.hacks_log.read_text(), "")
+
+    def test_dump_hero_art_from_working_copy_without_logging(self):
+        self.use_input_rom(self.build_sprite_rom())
+        self.run_wrapper("reset")
+        before = self.working.read_bytes()
+        result = subprocess.run(
+            [str(self.root / "rc2h"), "dump-art", "hero"],
+            cwd=self.root / "input",
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        with Image.open(self.root / "working" / "hero-art.png") as image:
+            self.assertEqual(image.size, (84, 50))
+            self.assertEqual(image.getpixel((16, 0)), (255, 0, 0))
+        self.assertEqual(self.working.read_bytes(), before)
+        self.assertEqual(self.hacks_log.read_text(), "")
+
+    def test_dump_each_character_from_working_copy(self):
+        starts = {
+            "hero": 0x9106, "pit": 0x9606, "lane": 0x9A46, "kyle": 0x9DC6,
+            "jude": 0xA306, "lee": 0xA7C6, "lora": 0xACC6, "zold": 0xB0E6,
+        }
+        rom = bytearray(self.rom)
+        for index, offset in enumerate(starts.values()):
+            color = index % 4
+            rom[offset:offset + 16] = bytes((0xFF if color & 1 else 0, 0xFF if color & 2 else 0)) * 8
+        self.use_input_rom(bytes(rom))
+        self.run_wrapper("reset")
+        for index, character in enumerate(starts):
+            with self.subTest(character=character):
+                result = subprocess.run(
+                    [str(self.root / "rc2h"), "dump-art", character],
+                    cwd=self.root / "input",
+                    capture_output=True,
+                    text=True,
+                )
+                self.assertEqual(result.returncode, 0, result.stderr)
+                with Image.open(self.root / "working" / f"{character}-art.png") as image:
+                    self.assertEqual(image.size, (84, 50))
+                    shade = (index % 4) * 85
+                    self.assertEqual(image.getpixel((0, 0)), (shade, shade, shade))
+        self.assertEqual(self.working.read_bytes(), bytes(rom))
+        self.assertEqual(self.hacks_log.read_text(), "")
+
+    def test_inject_each_character_and_log(self):
+        starts = {
+            "hero": 0x9106, "pit": 0x9606, "lane": 0x9A46, "kyle": 0x9DC6,
+            "jude": 0xA306, "lee": 0xA7C6, "lora": 0xACC6, "zold": 0xB0E6,
+        }
+        self.use_input_rom(bytes(0x20000))
+        self.run_wrapper("reset")
+        expected = bytearray(0x20000)
+        for character, offset in starts.items():
+            with self.subTest(character=character):
+                self.assertEqual(self.run_wrapper("dump-art", character).returncode, 0)
+                png = self.root / "working" / f"{character}-art.png"
+                with Image.open(png) as image:
+                    edited = image.copy()
+                edited.putpixel((0, 0), (85, 85, 85))
+                edited.save(png)
+                result = subprocess.run(
+                    [str(self.root / "rc2h"), "inject-art", character],
+                    cwd=self.root / "input",
+                    capture_output=True,
+                    text=True,
+                )
+                self.assertEqual(result.returncode, 0, result.stderr)
+                expected[offset] = 0x80
+                self.assertEqual(self.working.read_bytes(), expected)
+        self.assertEqual(
+            self.hacks_log.read_text(),
+            "".join(f"inject-art {character}\n" for character in starts),
+        )
+
+    def test_character_injection_wrong_size_does_not_change_rom_or_log(self):
+        self.run_wrapper("reset")
+        before = self.working.read_bytes()
+        Image.new("RGB", (1, 1)).save(self.root / "working" / "hero-art.png")
+        result = self.run_wrapper("inject-art", "hero")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("expected a 84x50 image", result.stderr)
+        self.assertEqual(self.working.read_bytes(), before)
         self.assertEqual(self.hacks_log.read_text(), "")
 
     def test_read_art_applies_png_and_logs_hack(self):

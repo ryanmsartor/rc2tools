@@ -238,6 +238,8 @@ address labels. Ranges that span several banks use the same layout.
 that copy from `input/` first if it does not exist.
 
 `./rc2h` is a shorthand for `./rc2t hack` and accepts the same arguments.
+Run `./rc2h` without arguments, or with `h`, `help`, `-h`, `-help`, `--h`,
+or `--help`, to see its commands.
 
 ```sh
 ./rc2t hack reset     # delete the in-progress copy and replace it with a fresh copy of input/
@@ -245,12 +247,26 @@ that copy from `input/` first if it does not exist.
 ./rc2t hack finalize  # copy the in-progress copy to output/ and write an IPS patch
 ./rc2t hack swap-char-sprite hero pit  # edit the in-progress copy in place
 ./rc2t hack dump-art title   # write working/title-art.png from the in-progress copy
+./rc2h dump-art hero         # write working/hero-art.png from the in-progress copy
+./rc2h inject-art hero       # apply working/hero-art.png to the in-progress copy
 ./rc2t hack inject-art title   # apply an edited working/title-art.png to the in-progress copy
 ```
 
 Character names for `swap-char-sprite` are `hero`, `pit`, `lane`, `kyle`,
 `jude`, `lee`, `lora`, and `zold`. The swap exchanges the nine standard poses,
 defeat sprite, level-up face, and POW-screen portrait of the two characters.
+
+`dump-art <character>` exports those character graphics to
+`working/<character>-art.png` at native pixel size. The first
+three columns have rows for down, left, and up: two idle poses and an attack
+pose in each row. The 32×32 POW portrait is to their right, with the defeated
+sprite and level-up face below it. Red lines and padding separate the images.
+`inject-art <character>` reads the corresponding 84×50 PNG and replaces only
+that character's nine standard poses, defeated sprite, level-up face, and POW
+portrait in the in-progress ROM. Pixel colors are converted to grayscale and
+mapped to the nearest shade of the relevant dump palette (the sprite and POW
+portrait palettes differ). Sprite palette index 0 is transparent in-game.
+Red separators and padding are ignored, and image transparency is not used.
 
 `dump-art title` writes the title screen's logo above the START/CONTINUE line to
 `working/title-art.png`. The image is 160×88 pixels: the art's 11 rows of
