@@ -123,14 +123,69 @@ The cursor is sprite 0 with tile `0xD4`. Sprites use unsigned addressing, so til
 
 This test checks only that these bytes are copied and shown on the title screen at frame 90. It does not show that no other screen reads the same bytes, or that the loader reads them the same way on every run.
 
-### Limits on using replacement tiles (from code analysis; not yet tested)
+### Source-swap test (verified at frame 300)
+
+`scratch/rom-trace/title_source_swap.py` changed four bytes, at physical `0x18112`–`0x18119`. These are the source-address fields of the two title descriptor records. Record 1 now reads CPU `0x4A1E` (physical `0x18A1E`) instead of `0x66AE`. Record 2 now reads CPU `0x4F6E` (physical `0x18F6E`) instead of `0x6BFE`. Both new sources are inside the bank-6 boss-sprite block.
+
+Results:
+- VRAM `0x8800` and `0x9300` match the new source bytes, and the unpatched ROM still matches its original sources.
+- The original title shows the logo. The patched title shows the boss-sprite tiles in the logo slots, and the bank-4 tilemap and all tile bytes are unchanged. Tile IDs are still the same, so only the tile data under them changes.
+- Record data is not loader code. The loader code is unchanged, but the four changed bytes are part of the descriptor list.
+- The cursor shares tile `0xD4` with the logo, so the cursor graphic is affected by any change to that slot.
+
+### Single-cell replacement test (verified at frame 300)
+
+`scratch/rom-trace/title_dog_cell.py` changed one cell of a repeated tile. It starts from the original ROM and makes three changes:
+- It copies the descriptor list to a free run of `0xFF` in bank 0 at CPU `0x3FC6`, 20 bytes, and repoints pointer word 5 (`0x1800A`) to it. The list has the two original records and a third record that copies 16 bytes from CPU `0x489E` (bank 6, the first tile of the dog idle frame) to VRAM `0x8D50`. That is tile ID `0xD5`, the slot right after record 1.
+- It sets the tilemap cell at row 4, column 6 (file `0x13C8A`) from `0x5A` to `0xD5`. Tile `0x5A` is used in 32 cells, and only this one changes.
+
+Results: 23 bytes change in total. The title's pixel diff against the original is only the 8×8 cell at x 48–55, y 32–39. The other 31 `0x5A` cells are unchanged. The new cell shows one tile of the dog frame.
+
+This answers the repetition question. A repeated tile cannot be changed in one cell alone. A new tile ID for that cell, plus a copy record, is needed. The tilemap length does not change. The descriptor list does, by one record, and it has to move because the bytes after its terminator are not free.
+
+### Capacity test: how many distinct cells fit (verified at frame 300)
+
+`scratch/rom-trace/title_capacity_probe.py` is a read-only budget check on the original ROM. Results:
+- LCDC is `0xE3`, so BG IDs are signed (bit 4 = 0). One frame can address 256 BG patterns, in VRAM `0x8800`–`0x97FF`.
+- The art grid is 13 rows × 20 columns, or 260 cells. It uses 163 distinct IDs in the original. The text rows 13–17 (100 cells) use 22 IDs, including `0x30` and `0xD3`.
+- Bank 6 has 2,048 tile slots, about 1,995 of them distinct. Tile supply is not the limit. The 256-ID BG budget is.
+
+`scratch/rom-trace/title_max_cells.py` tries to use the whole budget:
+- It keeps the 22 text IDs. The other 234 IDs get new patterns, copied from the first contiguous window of 234 distinct bank-6 tiles. That window is at file `0x18D10` (CPU `0x4D10`), because bank 6 has duplicate tiles.
+- The descriptor list is 80 bytes, at CPU `0x0061` in bank 0 (a run of `0xFF` of that length). It starts with the two original records, since they also load the text tiles at `0x30` and `0xD3`, and then has 11 records for the runs of rewritten IDs. Pointer word 5 is repointed to it.
+- The 260 art cells use the 234 rewritten IDs in order, so the last 26 cells repeat. 342 bytes change in total.
+
+Results:
+- The text tile VRAM is unchanged. The 234 rewritten VRAM slots match their sources.
+- The 260 art cells use 234 distinct VRAM patterns. That is the maximum for one frame with the text kept.
+- Counting distinct on-screen blocks gives 253 instead. That count is not reliable here. The STAT handler at `0x594` writes `BGP` and `OBP0` as `0x2D` and turns OBJ off on its interrupts, so bands of the screen use a different gray mapping, and the same tile can look different in different bands.
+
+Beyond 256 (not tested): `LCDC` bit 4 could change partway down the screen, so the top and bottom halves could use different ID ranges. Together the two ranges cover 384 slots, `0x8000`–`0x97FF`. OBJ sprites use their own 256-slot range and add more.
+
+### Limits on using replacement tiles (partly tested)
+
+The source-swap, single-cell, and capacity tests above confirm the first two points below and the free-space point. The rest is still from code analysis.
+
+
 
 - **Bank:** a source in bank 0 works from anywhere. A source in CPU `0x4000`–`0x7FFF` must be in bank 6, the bank the loader maps. Data in bank 4 or any other bank would be read as bank 6 data.
 - **Contiguity:** each record copies one contiguous run, `BC` bytes from `DE` to `HL`. Tiles from several places need several records.
 - **Record count:** the title list at `0x18110` has exactly two records and a terminator. Adding more means repointing pointer word 5 to a new list. That list is read through the same mapped bank, so it must also be in bank 0 or bank 6.
 - **VRAM slot:** the destination in a record fixes the VRAM slot. The tilemap refers to slots by ID, so to show a new tile in a different slot the bank-4 stream at `0x7C30` must use the new IDs.
 - **Shared tile:** the cursor sprite uses tile `0xD4`, the same bytes as BG tile `0xD4`, so changing that slot also changes the cursor.
-- **Free space:** none is confirmed yet. Free runs in bank 0 or bank 6 have not been searched for.
+- **Free space:** a read-only scan (`scratch/rom-trace/free_space_scan.py`) found no large free area. The usable `0xFF` runs are file `0x0061`–`0x00FF` in bank 0 (159 bytes, interrupt-vector area, about 9 tiles), `0x3FC6`–`0x3FFE` in bank 0 (57 bytes, about 3 tiles), and `0x1BF80`–`0x1BFFF` in bank 6 (128 bytes, about 8 tiles). That is about 20 tiles in total. Each `0xFF` run may still be real solid-colour tile data, so these are not proven unused.
+
+## Art capacity and read-art layout
+
+The title's screen wipe repeats about every 697 frames. Frames 0–353 are the wipe-in, and the first static window on the stock ROM is frames 354–736 (the second is 1051–1433). `scratch/rom-trace/wipe_scan.py` finds these windows. Comparisons against the original screen must use a frame inside a static window. Frame 500 is used below. The frame-300 results in the sections above were captured mid-wipe, so treat them as evidence about loader logic only, not as screen comparisons.
+
+The tilemap grid is 13 rows × 20 columns at file `0x13C34`. The first cell is BG `(0,0)`, and each row is written to BG rows 0–12. Row 13 starts at `0x13D38`, which is the menu text. An earlier version used `0x13C36` and shifted the art two cells right. It also wrote into row 13, which changed the menu glyphs.
+
+Tile ID `0x3E` is a menu glyph used in rows 13–17, and `0x30` is blank filler. `0xD3` is the copyright tile, and `0xD4` is the menu cursor, which is shared with the logo. These four keep their stock bytes, and the in-place pool is `0x31`–`0x3D`, `0x3F`–`0x7F`, and `0x80`–`0xD2`. That gives 161 IDs.
+
+`rc2t hack read-art title` quantizes the PNG to four shades, using the same four colour indices as the title palette `BGP 0x2D`. The PNG then uses 175 unique 8×8 tiles: 161 rewritten in place, and 14 extras at IDs `0xD5`–`0xE2` (VRAM `0x8D50`–`0x8EFF`). The copy list is 6 bytes per record, plus a zero terminator, which makes 98 bytes at bank 0 file `0x61`. Pointer word 5 (`0x1800A`) is repointed to it. Extra tiles go in free `0xFF` runs. Those runs are bank 0 `0x3FC6`–`0x3FFE` (3 storage slots) and bank 6 `0x1BF80`–`0x1BFFF` (8 slots). The copy list is placed in the bank 0 run at `0x61`, which is the choice that leaves the most 16-byte slots free.
+
+Verification at frame 500: the rendered grid matches the quantized PNG, VRAM matches the copy list, and screen rows 104+ match the original screen. A pixel check of the whole screen against the PNG is not valid, because the title palette changes by band (STAT handler at `0x594`). Capacity is exact: 175 unique tiles fit, and 176 raises `ValueError`.
 
 ## Dead ends
 
@@ -151,5 +206,6 @@ This test checks only that these bytes are copied and shown on the title screen 
 
 - PyBoy's `hook_register(bank, addr, cb, ctx)` patches the byte to `0xDB`. Hooks must be on instruction addresses. Do not deregister a hook from inside its callback.
 - The register file exposes `A`, `B`, `C`, `D`, `E`, `F`, `HL`, `PC`, and `SP`. There are no `H`, `L`, `DE`, or `BC` attributes, so compose them.
-- `memory[bank, addr]` reads banked ROM. `pyboy.tick(1, False)` advances one frame.
+- `memory[bank, addr]` reads banked ROM. `pyboy.tick(count, render)` advances frames. Pass `render=True` on the frame you capture. With `render=False`, `pyboy.screen.image` and `screen.ndarray` stay black even though the game is running.
+- Capture the title after about 300 frames. At frame 90 the logo has not drawn yet.
 - Do not name a script `dis.py`. It shadows the standard library `dis` module and breaks NumPy.

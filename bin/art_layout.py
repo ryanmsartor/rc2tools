@@ -1,78 +1,109 @@
 """Named ROM art layouts for `rc2t hack dump-art` and `rc2t hack read-art`.
 
-A layout places each tile of a ROM chunk in its on-screen cell. Tile IDs are
-BG-map IDs under signed tile addressing (LCDC=0xE3).
+The title screen's BG map is a tilemap in the ROM. Its tiles are loaded by a
+copy list: six-byte records (length, source CPU address, VRAM destination, all
+little-endian) ending with a zero length. Tile IDs are BG-map IDs under signed
+tile addressing (LCDC=0xE3).
+
+`read-art` rewrites the tilemap and copy list. Stock tiles are rewritten in
+place, and any extra tiles are copied from free ROM space.
 """
 
+import struct
 from dataclasses import dataclass
-from typing import Optional, Tuple
+from typing import Dict, List, Tuple
 
 from PIL import Image
 
 
 TILE_SIZE = 8
 TILE_BYTES = 16
-EMPTY_CELL = "--"
-
-# Cells of the title screen's BG map as tile IDs, for the rows above the
-# START/CONTINUE line (row 13). This is the ROM tilemap stream at bank 4
-# 0x7C30 (decoded by bank 0 0x0A78), checked against VRAM at frame 90.
-# Rows below START/CONTINUE hold the menu cursor (sprite 0, tile 0xD4), the
-# menu text, and the copyright tile 0xD3, so they are left out.
-# `--` marks a cell that is not title art.
-TITLE_GRID = """
-30 30 30 30 30 30 30 30 30 30 30 30 30 30 30 30 30 30 30 30
-30 C7 C8 C9 CA 30 30 30 30 30 30 30 31 32 30 30 33 34 35 36
-30 CB CC CD CE 37 38 39 3A 3B 3C 3D 3E 3F 40 41 42 43 44 45
-30 CF D0 D1 D2 46 47 48 49 4A 4B 4C 4D 4E 4F 50 51 52 53 54
-30 55 56 57 58 59 5A 5A 5A 5A 5A 5A 5A 5A 5B 5C 5D 5E 5F 30
-60 61 62 63 64 65 66 67 5A 5A 68 69 6A 6B 6C 6D 6E 6F 70 30
-71 72 73 74 75 76 77 78 79 7A 7B 7C 7D 7E 7F 5A 80 81 82 30
-83 84 85 86 87 88 89 8A 8B 8C 8D 8E 8F 90 91 92 93 94 95 30
-96 97 98 99 9A 9B 9C 9D 9E 9F A0 A1 A2 A3 A4 A5 A6 A7 A8 A9
-AA AB AC AD AE AF B0 B1 B2 B3 B4 B5 B6 B7 B8 B9 BA BB BC BD
-30 BE BF 5A 5A 5A 5A 5A 5A 5A 5A 5A 5A 5A C0 C1 C2 C3 C4 30
-30 30 30 BE BF 5A 5A 5A 5A 5A 5A 5A 5A 5A 5A C5 C6 30 30 30
-30 30 30 30 30 30 30 30 30 30 30 30 30 30 30 30 30 30 30 30
-"""
+RECORD_SIZE = 6
+BANK_SIZE = 0x4000
+BANK_6_OFFSET = 0x18000
+VRAM_BASE = 0x8000
+VRAM_WINDOW = 0x2000
 
 
 @dataclass(frozen=True)
 class ArtLayout:
-    # (first tile ID, last tile ID, ROM offset of the first tile)
-    tile_segments: Tuple[Tuple[int, int, int], ...]
-    # Rows of tile IDs, one per 8x8 cell; None where the cell is not this art.
-    grid: Tuple[Tuple[Optional[int], ...], ...]
+    # Tilemap cells, row-major, one byte per cell, starting at tilemap_offset.
+    tilemap_offset: int
+    columns: int
+    rows: int
+    # File offset of the word holding the CPU address of the copy list.
+    pointer_offset: int
+    # Stock copy records (length, source CPU address, VRAM destination).
+    stock_copies: Tuple[Tuple[int, int, int], ...]
+    # (first tile ID, last tile ID, ROM offset of the first tile). These tiles
+    # are rewritten in place.
+    in_place_blocks: Tuple[Tuple[int, int, int], ...]
+    # Tiles beyond the in-place ones take IDs counting up from here.
+    extra_first_id: int
+    # Free ROM ranges (start, end exclusive), in fill order. The copy list goes
+    # in whichever range that holds it leaves the most 16-byte slots for extra
+    # tile bytes.
+    free_runs: Tuple[Tuple[int, int], ...]
     # Gray level of each colour index 0-3 as shown on screen.
     shades: Tuple[int, int, int, int]
 
     @property
     def image_size(self) -> Tuple[int, int]:
-        return (len(self.grid[0]) * TILE_SIZE, len(self.grid) * TILE_SIZE)
+        return (self.columns * TILE_SIZE, self.rows * TILE_SIZE)
 
-    def rom_offset(self, tile_id: int) -> int:
-        for first, last, offset in self.tile_segments:
+    def in_place_ids(self) -> List[int]:
+        return [tile_id for first, last, _ in self.in_place_blocks for tile_id in range(first, last + 1)]
+
+    def in_place_offset(self, tile_id: int) -> int:
+        for first, last, offset in self.in_place_blocks:
             if first <= tile_id <= last:
                 return offset + (tile_id - first) * TILE_BYTES
-        raise ValueError(f"tile 0x{tile_id:02X} is not part of this art")
-
-
-def _parse_grid(text: str) -> Tuple[Tuple[Optional[int], ...], ...]:
-    return tuple(
-        tuple(None if cell == EMPTY_CELL else int(cell, 16) for cell in line.split())
-        for line in text.strip().splitlines()
-    )
+        raise ValueError(f"tile 0x{tile_id:02X} is not an in-place tile")
 
 
 ART_LAYOUTS = {
-    # The two tile blocks are the VRAM copies at 0x8800 and 0x9300 (docs/rom-map.md).
-    # Shades are colour indices 0-3 under the title screen palette, BGP 0x2D.
+    # The stock list copies tile blocks 0x80-0xD4 to VRAM 0x8800 and 0x30-0x7F
+    # to VRAM 0x9300. Tiles 0x30, 0x3E, 0xD3 and 0xD4 (blank, a menu glyph
+    # shared with the title's tilemap rows 13-17, copyright and menu cursor)
+    # are not rewritten. Shades are colour indices 0-3 under the title screen
+    # palette, BGP 0x2D.
     "title": ArtLayout(
-        tile_segments=((0x80, 0xD4, 0x1A6AE), (0x30, 0x7F, 0x1ABFE)),
-        grid=_parse_grid(TITLE_GRID),
+        tilemap_offset=0x13C34,
+        columns=20,
+        rows=13,
+        pointer_offset=0x1800A,
+        stock_copies=((0x0550, 0x66AE, 0x8800), (0x0500, 0x6BFE, 0x9300)),
+        in_place_blocks=((0x31, 0x3D, 0x1AC0E), (0x3F, 0x7F, 0x1ACEE), (0x80, 0xD2, 0x1A6AE)),
+        extra_first_id=0xD5,
+        free_runs=((0x61, 0x100), (0x3FC6, 0x3FFF), (0x1BF80, 0x1C000)),
         shades=(170, 0, 85, 255),
     ),
 }
+
+
+def _cpu_to_file(cpu: int) -> int:
+    if cpu < BANK_SIZE:
+        return cpu
+    if cpu < 2 * BANK_SIZE:
+        return BANK_6_OFFSET + (cpu - BANK_SIZE)
+    raise ValueError(f"CPU address 0x{cpu:04X} is outside banks 0 and 6")
+
+
+def _file_to_cpu(offset: int) -> int:
+    if offset < BANK_SIZE:
+        return offset
+    if BANK_6_OFFSET <= offset < BANK_6_OFFSET + BANK_SIZE:
+        return BANK_SIZE + (offset - BANK_6_OFFSET)
+    raise ValueError(f"file offset 0x{offset:05X} is not in bank 0 or bank 6")
+
+
+def _tile_vram(tile_id: int) -> int:
+    signed = tile_id - 256 if tile_id >= 0x80 else tile_id
+    return 0x9000 + signed * TILE_BYTES
+
+
+def _read_u16(rom: bytes, offset: int) -> int:
+    return rom[offset] | rom[offset + 1] << 8
 
 
 def _decode_tile(rom: bytes, offset: int) -> list:
@@ -92,13 +123,26 @@ def _encode_tile(rows: list) -> bytes:
     return bytes(data)
 
 
+def _load_vram(layout: ArtLayout, rom: bytes) -> bytearray:
+    vram = bytearray(VRAM_WINDOW)
+    pos = _cpu_to_file(_read_u16(rom, layout.pointer_offset))
+    while True:
+        length = _read_u16(rom, pos)
+        if length == 0:
+            return vram
+        src = _cpu_to_file(_read_u16(rom, pos + 2))
+        dst = _read_u16(rom, pos + 4) - VRAM_BASE
+        vram[dst:dst + length] = rom[src:src + length]
+        pos += RECORD_SIZE
+
+
 def render_art(layout: ArtLayout, rom: bytes) -> Image.Image:
+    vram = _load_vram(layout, rom)
     image = Image.new("L", layout.image_size, layout.shades[3])
-    for row, cells in enumerate(layout.grid):
-        for col, tile_id in enumerate(cells):
-            if tile_id is None:
-                continue
-            pixels = _decode_tile(rom, layout.rom_offset(tile_id))
+    for row in range(layout.rows):
+        for col in range(layout.columns):
+            tile_id = rom[layout.tilemap_offset + row * layout.columns + col]
+            pixels = _decode_tile(vram, _tile_vram(tile_id) - VRAM_BASE)
             for y, indices in enumerate(pixels):
                 for x, index in enumerate(indices):
                     image.putpixel((col * TILE_SIZE + x, row * TILE_SIZE + y), layout.shades[index])
@@ -109,27 +153,84 @@ def _nearest_index(layout: ArtLayout, gray: int) -> int:
     return min(range(4), key=lambda index: abs(layout.shades[index] - gray))
 
 
-def apply_art(layout: ArtLayout, rom: bytearray, image: Image.Image) -> None:
+def _storage_slots(runs: List[Tuple[int, int]]) -> List[int]:
+    return [offset for start, end in runs for offset in range(start, end - TILE_BYTES + 1, TILE_BYTES)]
+
+
+def _place_list(free_runs: Tuple[Tuple[int, int], ...], size: int) -> Tuple[int, List[Tuple[int, int]]]:
+    best = None
+    for i, (start, end) in enumerate(free_runs):
+        if end - start < size:
+            continue
+        remaining = list(free_runs)
+        remaining[i] = (start + size, end)
+        key = (len(_storage_slots(remaining)), -(end - start))
+        if best is None or key > best[0]:
+            best = (key, start, remaining)
+    if best is None:
+        raise ValueError(f"no free ROM run holds the {size}-byte copy list")
+    return best[1], best[2]
+
+
+def apply_art(layout: ArtLayout, rom: bytearray, image: Image.Image) -> int:
+    """Write the image into the ROM and return the number of unique tiles it uses."""
     if image.size != layout.image_size:
         width, height = layout.image_size
         raise ValueError(f"expected a {width}x{height} image, got {image.width}x{image.height}")
     gray = image.convert("L")
-    tiles = {}
-    for row, cells in enumerate(layout.grid):
-        for col, tile_id in enumerate(cells):
-            if tile_id is None:
-                continue
-            pixels = [
-                [
-                    _nearest_index(layout, gray.getpixel((col * TILE_SIZE + x, row * TILE_SIZE + y)))
-                    for x in range(TILE_SIZE)
-                ]
+    lut = [_nearest_index(layout, level) for level in range(256)]
+    patterns: List[Tuple[int, ...]] = []
+    pattern_index: Dict[Tuple[int, ...], int] = {}
+    cells: List[int] = []
+    for row in range(layout.rows):
+        for col in range(layout.columns):
+            pattern = tuple(
+                lut[gray.getpixel((col * TILE_SIZE + x, row * TILE_SIZE + y))]
                 for y in range(TILE_SIZE)
-            ]
-            if tiles.setdefault(tile_id, pixels) != pixels:
-                raise ValueError(
-                    f"tile 0x{tile_id:02X} appears in more than one cell with different pixels"
-                )
-    for tile_id, pixels in tiles.items():
-        offset = layout.rom_offset(tile_id)
-        rom[offset:offset + TILE_BYTES] = _encode_tile(pixels)
+                for x in range(TILE_SIZE)
+            )
+            index = pattern_index.get(pattern)
+            if index is None:
+                index = pattern_index[pattern] = len(patterns)
+                patterns.append(pattern)
+            cells.append(index)
+
+    in_ids = layout.in_place_ids()
+    extra_count = max(0, len(patterns) - len(in_ids))
+    if extra_count and layout.extra_first_id + extra_count > 0x100:
+        raise ValueError(f"{extra_count} extra tiles do not fit in tile IDs above 0x{layout.extra_first_id:02X}")
+    list_size = RECORD_SIZE * (len(layout.stock_copies) + extra_count) + 2
+    list_start, runs = _place_list(layout.free_runs, list_size)
+    slots = _storage_slots(runs)
+    if extra_count > len(slots):
+        raise ValueError(f"{extra_count} extra tiles need free ROM, but only {len(slots)} 16-byte slots remain")
+
+    writes: List[Tuple[int, bytes]] = []
+    records = list(layout.stock_copies)
+    tile_ids: List[int] = []
+    for index, pattern in enumerate(patterns):
+        data = _encode_tile([list(pattern[y * TILE_SIZE:(y + 1) * TILE_SIZE]) for y in range(TILE_SIZE)])
+        if index < len(in_ids):
+            tile_id = in_ids[index]
+            writes.append((layout.in_place_offset(tile_id), data))
+        else:
+            extra = index - len(in_ids)
+            tile_id = layout.extra_first_id + extra
+            storage = slots[extra]
+            writes.append((storage, data))
+            records.append((TILE_BYTES, _file_to_cpu(storage), _tile_vram(tile_id)))
+        tile_ids.append(tile_id)
+
+    for cell, index in enumerate(cells):
+        writes.append((layout.tilemap_offset + cell, bytes([tile_ids[index]])))
+
+    copy_list = bytearray()
+    for length, src, dst in records:
+        copy_list += struct.pack("<HHH", length, src, dst)
+    copy_list += b"\x00\x00"
+    writes.append((list_start, bytes(copy_list)))
+    writes.append((layout.pointer_offset, struct.pack("<H", _file_to_cpu(list_start))))
+
+    for offset, data in writes:
+        rom[offset:offset + len(data)] = data
+    return len(patterns)
