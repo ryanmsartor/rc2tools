@@ -10,6 +10,7 @@ from PIL import Image
 
 from art_layout import ART_LAYOUTS, apply_art, render_art
 from character_art import apply_character_art, render_character_art
+from font_art import apply_font_art, render_font_art
 from npc_art import apply_npc_art, render_npc_art
 from swap_character_sprite import CHARACTER_SPRITES, swap_character_sprites
 
@@ -24,7 +25,7 @@ OUTPUT_DIR = ROOT / "output"
 DEFAULT_FINALIZE_TAG = "hack finalized"
 SWAP_SUBCOMMAND = "swap-char-sprite"
 SWAP_ALIAS = "swap-character-sprite"
-ART_NAMES = (*ART_LAYOUTS, *CHARACTER_SPRITES, "npc")
+ART_NAMES = (*ART_LAYOUTS, *CHARACTER_SPRITES, "npc", "font")
 IPS_HEADER = b"PATCH"
 IPS_EOF = b"EOF"
 IPS_EOF_OFFSET = int.from_bytes(IPS_EOF, "big")
@@ -110,6 +111,8 @@ def dump_art(name: str) -> None:
     rom = WORKING_ROM_PATH.read_bytes()
     if name == "npc":
         image = render_npc_art(rom)
+    elif name == "font":
+        image = render_font_art(rom)
     elif name in CHARACTER_SPRITES:
         image = render_character_art(rom, name)
     else:
@@ -125,12 +128,13 @@ def read_art(name: str) -> None:
     with Image.open(path) as image:
         if name == "npc":
             apply_npc_art(rom, image)
+        elif name == "font":
+            apply_font_art(rom, image)
         elif name in CHARACTER_SPRITES:
             apply_character_art(rom, name, image)
         else:
             apply_art(ART_LAYOUTS[name], rom, image)
     WORKING_ROM_PATH.write_bytes(rom)
-    record_hack(f"inject-art {name}")
     print(f"Applied {path} to {WORKING_ROM_PATH}")
 
 
@@ -205,6 +209,14 @@ def main() -> int:
         help="apply working/<name>-art.png to the in-progress hack",
     )
     _add_art_arguments(read_parser)
+    subparsers.add_parser(
+        "dump-font",
+        help="synonym for dump-art font: export the stacked 1bpp font glyphs to working/font-art.png",
+    )
+    subparsers.add_parser(
+        "inject-font",
+        help="synonym for inject-art font: apply working/font-art.png to the in-progress hack",
+    )
     argv = sys.argv[1:]
     # Accept the original command name without listing it in help.
     if argv[:1] == [SWAP_ALIAS]:
@@ -229,6 +241,12 @@ def main() -> int:
         elif args.subcommand == "inject-art":
             for name in ART_NAMES if args.name == "all" else (args.name,):
                 read_art(name)
+                record_hack(f"inject-art {name}")
+        elif args.subcommand == "dump-font":
+            dump_art("font")
+        elif args.subcommand == "inject-font":
+            read_art("font")
+            record_hack("inject-font")
     except (OSError, ValueError) as error:
         print(f"Error: {error}", file=sys.stderr)
         return 1

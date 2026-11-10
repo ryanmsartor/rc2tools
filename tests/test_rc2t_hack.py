@@ -39,7 +39,7 @@ class HackWrapperTests(unittest.TestCase):
         shutil.copy2(ROOT / "rc2t", self.root / "rc2t")
         shutil.copy2(ROOT / "rc2h", self.root / "rc2h")
         for name in ("hack_rom.py", "swap_character_sprite.py", "art_layout.py",
-                     "character_art.py", "npc_art.py", "render_graphics.py", "extract_json.py"):
+                     "character_art.py", "font_art.py", "npc_art.py", "render_graphics.py", "extract_json.py"):
             shutil.copy2(ROOT / "bin" / name, self.root / "bin" / name)
         self.rom = bytes(range(256)) * 0x200
         (self.root / "input" / ROM_NAME).write_bytes(self.rom)
@@ -394,7 +394,7 @@ class HackWrapperTests(unittest.TestCase):
         self.assertEqual(self.hacks_log.read_text(), "")
 
     def test_dump_and_inject_all_matches_individual_commands(self):
-        dump_names = ("title", "hero", "pit", "lane", "kyle", "jude", "lee", "lora", "zold", "npc")
+        dump_names = ("title", "hero", "pit", "lane", "kyle", "jude", "lee", "lora", "zold", "npc", "font")
         self.use_input_rom(self.build_sprite_rom())
         self.assertEqual(self.run_wrapper("reset").returncode, 0)
         before = self.working.read_bytes()
@@ -406,7 +406,7 @@ class HackWrapperTests(unittest.TestCase):
             path = self.root / "working" / f"{name}-art.png"
             with Image.open(path) as image:
                 edited = image.copy()
-            sizes = {"title": (160, 88), "npc": (203, 169)}
+            sizes = {"title": (160, 88), "npc": (203, 169), "font": (53, 71)}
             self.assertEqual(edited.size, sizes.get(name, (84, 50)))
             if name == "title":
                 edited.putpixel((0, 0), 0 if edited.getpixel((0, 0)) != 0 else 255)
@@ -572,6 +572,89 @@ class HackWrapperTests(unittest.TestCase):
         result = self.run_wrapper("inject-art", "npc")
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("ROM does not contain all documented NPC and enemy graphics", result.stderr)
+        self.assertEqual(self.working.read_bytes(), before)
+        self.assertEqual(self.hacks_log.read_text(), "")
+
+    def test_dump_font_writes_six_by_eight_glyph_sheet_with_red_grid(self):
+        self.run_wrapper("reset")
+        result = self.run_wrapper("dump-font")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        with Image.open(self.root / "working" / "font-art.png") as image:
+            self.assertEqual(image.size, (53, 71))
+            red = (255, 0, 0)
+            # Red lines separate the glyphs horizontally (x=8) and vertically (y=8).
+            self.assertEqual(image.getpixel((0, 8)), red)
+            self.assertEqual(image.getpixel((8, 0)), red)
+            self.assertNotEqual(image.getpixel((0, 9)), red)
+
+    def test_font_synonyms_match_and_log_their_own_spelling(self):
+        self.run_wrapper("reset")
+        self.assertEqual(self.run_wrapper("dump-art", "font").returncode, 0)
+        dumped = (self.root / "working" / "font-art.png").read_bytes()
+        self.assertEqual(self.run_wrapper("dump-font").returncode, 0)
+        self.assertEqual((self.root / "working" / "font-art.png").read_bytes(), dumped)
+        self.assertEqual(self.run_wrapper("inject-art", "font").returncode, 0)
+        self.assertEqual(self.run_wrapper("inject-font").returncode, 0)
+        self.assertEqual(self.working.read_bytes(), self.rom)
+        self.assertEqual(self.hacks_log.read_text(), "inject-art font\ninject-font\n")
+
+    def test_font_round_trip_leaves_rom_unchanged(self):
+        self.run_wrapper("reset")
+        self.assertEqual(self.run_wrapper("dump-font").returncode, 0)
+        result = self.run_wrapper("inject-font")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self.working.read_bytes(), self.rom)
+        self.assertEqual(self.hacks_log.read_text(), "inject-font\n")
+
+    def test_font_edit_changes_only_its_glyph_byte(self):
+        # Glyphs fill the sheet in ROM order: glyph 2t is the top of tile t and 2t+1 is its bottom.
+        # Each cell is 8x8 on a 9-pixel pitch, so sheet pixel (x, y) is row 0 of the glyph at
+        # cell (x // 9, y // 9). Pixel (9, 0) is glyph 1 (tile 0, bottom), (0, 9) is glyph 6
+        # (tile 3, top), and (0, 18) is glyph 12 (tile 6, top).
+        for x, y, offset in ((0, 0, 0xB986), (9, 0, 0xB98E), (0, 9, 0xB9B6), (0, 18, 0xB9E6)):
+            with self.subTest(offset=hex(offset)):
+                self.run_wrapper("reset")
+                self.assertEqual(self.run_wrapper("dump-font").returncode, 0)
+                png = self.root / "working" / "font-art.png"
+                with Image.open(png) as image:
+                    edited = image.copy()
+                edited.putpixel((x, y), (0, 0, 0) if edited.getpixel((x, y)) != (0, 0, 0) else (255, 255, 255))
+                edited.save(png)
+                self.assertEqual(self.run_wrapper("inject-font").returncode, 0)
+                changed = [index for index, (old, new) in enumerate(zip(self.rom, self.working.read_bytes())) if old != new]
+                self.assertEqual(changed, [offset])
+
+    def test_font_injection_ignores_separator_pixels(self):
+        self.run_wrapper("reset")
+        before = self.working.read_bytes()
+        self.assertEqual(self.run_wrapper("dump-font").returncode, 0)
+        png = self.root / "working" / "font-art.png"
+        with Image.open(png) as image:
+            edited = image.copy()
+        edited.putpixel((8, 0), (0, 0, 0))
+        edited.putpixel((0, 8), (0, 0, 0))
+        edited.save(png)
+        self.assertEqual(self.run_wrapper("inject-font").returncode, 0)
+        self.assertEqual(self.working.read_bytes(), before)
+
+    def test_font_injection_wrong_size_does_not_change_rom_or_log(self):
+        self.run_wrapper("reset")
+        before = self.working.read_bytes()
+        Image.new("RGB", (1, 1)).save(self.root / "working" / "font-art.png")
+        result = self.run_wrapper("inject-font")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("expected a 53x71 image", result.stderr)
+        self.assertEqual(self.working.read_bytes(), before)
+        self.assertEqual(self.hacks_log.read_text(), "")
+
+    def test_font_injection_short_rom_fails_without_changing_working_copy(self):
+        self.use_input_rom(bytes(0x1000))
+        self.run_wrapper("reset")
+        before = self.working.read_bytes()
+        Image.new("RGB", (53, 71)).save(self.root / "working" / "font-art.png")
+        result = self.run_wrapper("inject-font")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("ROM does not contain the stacked font tiles", result.stderr)
         self.assertEqual(self.working.read_bytes(), before)
         self.assertEqual(self.hacks_log.read_text(), "")
 

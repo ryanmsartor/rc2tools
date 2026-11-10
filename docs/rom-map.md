@@ -511,7 +511,7 @@ Together these occupy `0xB886-0xB985` inclusive and exactly match the separately
 
 The 24 tiles at `0xB986-0xBB05` are not sprites. Each 16-byte tile holds two 8×8 monochrome glyphs stacked vertically: the first 8 bytes are the top glyph and the last 8 bytes are the bottom glyph. Each byte is one row, with bit 7 at the left. A set bit is background and a clear bit is ink. Row 8 of each glyph is usually `0xFF` (blank), which gives spacing between the stacked glyphs.
 
-Read as 2bpp tiles, these bytes look like noise. Read as this 1bpp layout, the glyphs are clear, and `./rc2t render-graphics 0xB986 0xBB06 output/glyphs.png --stacked-glyphs` renders them in black. Each 16-byte tile is drawn as one 8×16 cell, which matches the in-game look of solid black characters at double height.
+Read as 2bpp tiles, these bytes look like noise. Read as this 1bpp layout, the glyphs are clear, and `./rc2t render-graphics 0xB986 0xBB06 output/glyphs.png --stacked-glyphs` renders them in black. Each 16-byte tile is drawn as one 8×16 cell, which matches the in-game look of solid black characters at double height. `rc2t hack dump-font` and `rc2t hack inject-font` (synonyms `dump-art font` and `inject-art font`) edit this range through a 1:1 sheet of 48 separated 8×8 glyph cells, six per row across eight rows; see the README.
 
 Whether the game's loader uses this exact layout is not yet verified; it is the layout that renders as legible glyphs.
 

@@ -264,9 +264,14 @@ or `--help`, to see its commands.
 ./rc2h inject-art all        # apply every art PNG
 ./rc2h dump-art npc          # export documented town NPC and non-boss enemy graphics
 ./rc2h inject-art npc        # apply working/npc-art.png to the in-progress copy
+./rc2t hack dump-font        # write working/font-art.png from the in-progress copy
+./rc2t hack inject-font      # apply working/font-art.png to the in-progress copy
+./rc2h dump-art font         # same as dump-font
+./rc2h inject-art font       # same as inject-font
 ```
 
-The `all` targets process the title first, then the characters, then NPC art.
+The `all` targets process the title first, then the characters, then NPC art,
+then the font.
 They use the same files and behavior as each individual command: dumping overwrites
 existing PNGs, and injection records each applied image in `hacks.txt`.
 Processing stops on the first error; earlier dumps or injections remain in
@@ -287,6 +292,17 @@ edited egghead or dog frame is also written to its idle copy, so both locations
 stay identical. Red separators are ignored. Each pixel is mapped to the nearest
 of the four sprite shades. The image must be exactly 203×169 pixels, or
 injection fails and changes nothing.
+
+`dump-font` (also `dump-art font`) writes `working/font-art.png`, a 1:1 sheet of
+the 48 glyphs stored as 24 stacked 1bpp tiles at `0xB986-0xBB05`. Each glyph is
+an 8×8 cell with a 1-pixel red separator between cells, six cells per row, eight
+rows. Glyphs follow ROM order, left to right and then top to bottom, so each
+tile's top glyph is followed by its bottom glyph (the top row is glyphs 0-5).
+Dark pixels are ink (clear bits) and light pixels are background (set bits).
+`inject-font` (also `inject-art font`) reads the sheet back, thresholds each
+pixel to ink or background, and rewrites those 0x180 bytes. Red separators are
+ignored. The image must be exactly 53×71 pixels, or injection fails and changes
+nothing. The font is included in `dump-art all` and `inject-art all`.
 
 Character names for `swap-char-sprite` are `hero`, `pit`, `lane`, `kyle`,
 `jude`, `lee`, `lora`, and `zold`. The swap exchanges the nine standard poses,
@@ -320,7 +336,7 @@ cell, such as the blank filler tile `0x30`, so every cell that uses such a tile
 must have the same pixels. Otherwise `inject-art` fails and changes nothing.
 
 Each applied hack is recorded in `working/hacks.txt`, one line per hack. `reset`
-and `clear` delete this file, and `swap-char-sprite` and `inject-art` append to it.
+and `clear` delete this file, and `swap-char-sprite`, `inject-art`, and `inject-font` append to it.
 `finalize` does not copy it to `output/`.
 
 `finalize` writes `output/Rolan's Curse II (USA) (hack finalized).gb` and
