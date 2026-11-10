@@ -260,15 +260,30 @@ or `--help`, to see its commands.
 ./rc2h dump-art hero         # write working/hero-art.png from the in-progress copy
 ./rc2h inject-art hero       # apply working/hero-art.png to the in-progress copy
 ./rc2t hack inject-art title   # apply an edited working/title-art.png to the in-progress copy
-./rc2h dump-art all          # export title and all eight characters
-./rc2h inject-art all        # apply all nine art PNGs
+./rc2h dump-art all          # export title, all eight characters, and NPC art
+./rc2h inject-art all        # apply every art PNG
+./rc2h dump-art npc          # export documented town NPC and non-boss enemy graphics
+./rc2h inject-art npc        # apply working/npc-art.png to the in-progress copy
 ```
 
-The `all` target processes the title first, then the characters in the order
-listed below. It uses the same files and behavior as each individual command:
-dumping overwrites existing PNGs, and injection records each applied image in
-`hacks.txt`. Processing stops on the first error; earlier dumps or injections
-remain in place.
+The `all` targets process the title first, then the characters, then NPC art.
+They use the same files and behavior as each individual command: dumping overwrites
+existing PNGs, and injection records each applied image in `hacks.txt`.
+Processing stops on the first error; earlier dumps or injections remain in
+place.
+
+`dump-art npc` writes `working/npc-art.png`, a 1:1 sheet of all 124 frames from
+the idle town NPCs (`0x1861E-0x18A1D`) and the NPC and non-boss enemy sprites
+(`0xE25A-0xFD59`). Each 16×16 sprite occupies a 17-pixel cell with a 1-pixel
+red separator, six cells per row, with no labels. Each NPC or enemy's frames
+stay together in one row, in ROM order. Each four-pose set shares a row with one
+of the first seven enemy two-frame sets. Unused cells remain red. The energy
+orbs are not included.
+
+`inject-art npc` reads that sheet back and rewrites only the 124 sprites. Red
+separators and unused cells are ignored. Each pixel is mapped to the nearest of
+the four sprite shades. The image must be exactly 101×356 pixels, or injection
+fails and changes nothing.
 
 Character names for `swap-char-sprite` are `hero`, `pit`, `lane`, `kyle`,
 `jude`, `lee`, `lora`, and `zold`. The swap exchanges the nine standard poses,

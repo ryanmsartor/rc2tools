@@ -10,6 +10,8 @@ from PIL import Image
 
 from art_layout import ART_LAYOUTS, apply_art, render_art
 from character_art import apply_character_art, render_character_art
+from npc_art import render_npc_art
+from npc_art import apply_npc_art, render_npc_art
 from swap_character_sprite import CHARACTER_SPRITES, swap_character_sprites
 
 
@@ -23,6 +25,7 @@ OUTPUT_DIR = ROOT / "output"
 DEFAULT_FINALIZE_TAG = "hack finalized"
 SWAP_SUBCOMMAND = "swap-char-sprite"
 SWAP_ALIAS = "swap-character-sprite"
+ART_NAMES = (*ART_LAYOUTS, *CHARACTER_SPRITES, "npc")
 IPS_HEADER = b"PATCH"
 IPS_EOF = b"EOF"
 IPS_EOF_OFFSET = int.from_bytes(IPS_EOF, "big")
@@ -106,7 +109,12 @@ def art_png_path(name: str) -> Path:
 
 def dump_art(name: str) -> None:
     rom = WORKING_ROM_PATH.read_bytes()
-    image = render_character_art(rom, name) if name in CHARACTER_SPRITES else render_art(ART_LAYOUTS[name], rom)
+    if name == "npc":
+        image = render_npc_art(rom)
+    elif name in CHARACTER_SPRITES:
+        image = render_character_art(rom, name)
+    else:
+        image = render_art(ART_LAYOUTS[name], rom)
     path = art_png_path(name)
     image.save(path)
     print(f"Wrote {path}")
@@ -116,7 +124,9 @@ def read_art(name: str) -> None:
     rom = bytearray(WORKING_ROM_PATH.read_bytes())
     path = art_png_path(name)
     with Image.open(path) as image:
-        if name in CHARACTER_SPRITES:
+        if name == "npc":
+            apply_npc_art(rom, image)
+        elif name in CHARACTER_SPRITES:
             apply_character_art(rom, name, image)
         else:
             apply_art(ART_LAYOUTS[name], rom, image)
@@ -157,7 +167,7 @@ def _add_swap_arguments(parser: argparse.ArgumentParser) -> None:
 
 def _add_art_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
-        "name", choices=(*ART_LAYOUTS, *CHARACTER_SPRITES, "all"),
+        "name", choices=(*ART_NAMES, "all"),
         help="named art to use, or all supported art",
     )
 
@@ -215,10 +225,10 @@ def main() -> int:
         elif args.subcommand == SWAP_SUBCOMMAND:
             apply_swap_character_sprite(args.character1, args.character2)
         elif args.subcommand == "dump-art":
-            for name in (*ART_LAYOUTS, *CHARACTER_SPRITES) if args.name == "all" else (args.name,):
+            for name in ART_NAMES if args.name == "all" else (args.name,):
                 dump_art(name)
         elif args.subcommand == "inject-art":
-            for name in (*ART_LAYOUTS, *CHARACTER_SPRITES) if args.name == "all" else (args.name,):
+            for name in ART_NAMES if args.name == "all" else (args.name,):
                 read_art(name)
     except (OSError, ValueError) as error:
         print(f"Error: {error}", file=sys.stderr)

@@ -31,7 +31,7 @@ class HackWrapperTests(unittest.TestCase):
         shutil.copy2(ROOT / "rc2t", self.root / "rc2t")
         shutil.copy2(ROOT / "rc2h", self.root / "rc2h")
         for name in ("hack_rom.py", "swap_character_sprite.py", "art_layout.py",
-                     "character_art.py", "render_graphics.py", "extract_json.py"):
+                     "character_art.py", "npc_art.py", "render_graphics.py", "extract_json.py"):
             shutil.copy2(ROOT / "bin" / name, self.root / "bin" / name)
         self.rom = bytes(range(256)) * 0x200
         (self.root / "input" / ROM_NAME).write_bytes(self.rom)
@@ -357,8 +357,29 @@ class HackWrapperTests(unittest.TestCase):
         self.assertEqual(self.working.read_bytes(), bytes(rom))
         self.assertEqual(self.hacks_log.read_text(), "")
 
+    def test_dump_npc_art_includes_documented_ranges(self):
+        rom = bytearray(self.rom)
+        rom[0x1861E:0x18A1E] = bytes([0xFF, 0]) * ((0x18A1E - 0x1861E) // 2)
+        rom[0xE25A:0xFD5A] = bytes([0xFF, 0]) * ((0xFD5A - 0xE25A) // 2)
+        self.use_input_rom(bytes(rom))
+        self.assertEqual(self.run_wrapper("reset").returncode, 0)
+        result = subprocess.run(
+            [str(self.root / "rc2h"), "dump-art", "npc"],
+            cwd=self.root / "input",
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        with Image.open(self.root / "working" / "npc-art.png") as image:
+            self.assertEqual(image.size, (101, 356))
+            self.assertEqual(image.mode, "RGB")
+            self.assertEqual(image.getpixel((16, 0)), (255, 0, 0))
+            self.assertEqual(image.getpixel((0, 16)), (255, 0, 0))
+        self.assertEqual(self.working.read_bytes(), bytes(rom))
+        self.assertEqual(self.hacks_log.read_text(), "")
+
     def test_dump_and_inject_all_matches_individual_commands(self):
-        names = ("title", "hero", "pit", "lane", "kyle", "jude", "lee", "lora", "zold")
+        dump_names = ("title", "hero", "pit", "lane", "kyle", "jude", "lee", "lora", "zold", "npc")
         self.use_input_rom(self.build_sprite_rom())
         self.assertEqual(self.run_wrapper("reset").returncode, 0)
         before = self.working.read_bytes()
@@ -366,11 +387,12 @@ class HackWrapperTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(self.working.read_bytes(), before)
         self.assertEqual(self.hacks_log.read_text(), "")
-        for name in names:
+        for name in dump_names:
             path = self.root / "working" / f"{name}-art.png"
             with Image.open(path) as image:
                 edited = image.copy()
-            self.assertEqual(edited.size, (160, 88) if name == "title" else (84, 50))
+            sizes = {"title": (160, 88), "npc": (101, 356)}
+            self.assertEqual(edited.size, sizes.get(name, (84, 50)))
             if name == "title":
                 edited.putpixel((0, 0), 0 if edited.getpixel((0, 0)) != 0 else 255)
             else:
@@ -383,16 +405,17 @@ class HackWrapperTests(unittest.TestCase):
         )
         self.assertEqual(result.returncode, 0, result.stderr)
         combined = self.working.read_bytes()
-        expected_log = "".join(f"inject-art {name}\n" for name in names)
+        expected_log = "".join(f"inject-art {name}\n" for name in dump_names)
         self.assertEqual(self.hacks_log.read_text(), expected_log)
         self.assertNotEqual(combined, before)
 
         self.assertEqual(self.run_wrapper("reset").returncode, 0)
-        for name in names:
+        for name in dump_names:
             result = self.run_wrapper("inject-art", name)
             self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(self.working.read_bytes(), combined)
         self.assertEqual(self.hacks_log.read_text(), expected_log)
+
 
     def test_inject_all_stops_at_missing_image_and_keeps_prior_results(self):
         self.use_input_rom(self.build_sprite_rom())
@@ -471,6 +494,55 @@ class HackWrapperTests(unittest.TestCase):
         result = self.run_wrapper("dump-art", "logo")
         self.assertEqual(result.returncode, 2)
         self.assertIn("invalid choice", result.stderr)
+
+    def test_npc_art_round_trip_leaves_rom_unchanged(self):
+        self.use_input_rom(self.rom)
+        self.run_wrapper("reset")
+        self.assertEqual(self.run_wrapper("dump-art", "npc").returncode, 0)
+        result = self.run_wrapper("inject-art", "npc")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self.working.read_bytes(), self.rom)
+        self.assertEqual(self.hacks_log.read_text(), "inject-art npc\n")
+
+    def test_npc_art_edit_changes_only_its_sprite_tile_bytes(self):
+        # Sheet pixels (0, 0) and (0, 170) are the top-left corners of the first idle NPC
+        # frame (0x1861E) and the first four-pose enemy frame (0xF05A), which sits in row 10.
+        for x, y, offset in ((0, 0, 0x1861E), (0, 170, 0xF05A)):
+            with self.subTest(offset=hex(offset)):
+                self.use_input_rom(self.rom)
+                self.run_wrapper("reset")
+                self.assertEqual(self.run_wrapper("dump-art", "npc").returncode, 0)
+                png = self.root / "working" / "npc-art.png"
+                with Image.open(png) as image:
+                    edited = image.copy()
+                edited.putpixel((x, y), (0, 0, 0) if edited.getpixel((x, y)) != (0, 0, 0) else (255, 255, 255))
+                edited.save(png)
+                self.assertEqual(self.run_wrapper("inject-art", "npc").returncode, 0)
+                changed = [index for index, (old, new) in enumerate(zip(self.rom, self.working.read_bytes())) if old != new]
+                self.assertTrue(changed)
+                self.assertTrue(all(offset <= index < offset + 16 for index in changed), changed)
+                self.run_wrapper("reset")
+
+    def test_npc_injection_wrong_size_does_not_change_rom_or_log(self):
+        self.run_wrapper("reset")
+        before = self.working.read_bytes()
+        Image.new("RGB", (1, 1)).save(self.root / "working" / "npc-art.png")
+        result = self.run_wrapper("inject-art", "npc")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("expected a 101x356 image", result.stderr)
+        self.assertEqual(self.working.read_bytes(), before)
+        self.assertEqual(self.hacks_log.read_text(), "")
+
+    def test_npc_injection_short_rom_fails_without_changing_working_copy(self):
+        self.use_input_rom(bytes(0x1000))
+        self.run_wrapper("reset")
+        before = self.working.read_bytes()
+        Image.new("RGB", (101, 356)).save(self.root / "working" / "npc-art.png")
+        result = self.run_wrapper("inject-art", "npc")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("ROM does not contain all documented NPC and enemy graphics", result.stderr)
+        self.assertEqual(self.working.read_bytes(), before)
+        self.assertEqual(self.hacks_log.read_text(), "")
 
 
 if __name__ == "__main__":
