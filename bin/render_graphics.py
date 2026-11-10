@@ -16,6 +16,14 @@ SPRITE_TILE_POSITIONS = ((0, 0), (0, 1), (1, 0), (1, 1))
 SPRITE_WIDTH = TILE_WIDTH * 2
 SPRITE_GUTTER = 1
 GUTTER_COLOR = (192, 192, 192)
+# Cells without ROM bytes use lilac so they are not mistaken for all-white data.
+EMPTY_COLOR = (200, 162, 200)
+ROM_BANK_BYTES = 0x4000
+BANK_LABEL_PADDING = 4
+BANK_DIVIDER_PADDING = 8
+BANK_DIVIDER_THICKNESS = 2
+BANK_DIVIDER_HEIGHT = 2 * BANK_DIVIDER_PADDING + BANK_DIVIDER_THICKNESS
+BANK_DIVIDER_COLOR = (0, 0, 0)
 # Known pixels keep their palette shade, mapped to blue (index 0 is darkest, 3 lightest).
 BLUESCALE_PALETTE = (
     (0, 0, 96),
@@ -36,6 +44,13 @@ GREENSCALE_PALETTE = (
     (0, 88, 32),
     (40, 136, 80),
     (136, 200, 160),
+)
+# Known structure pixels (tilemaps, pointer and record tables, and routines) use the same scheme in purple.
+PURPLESCALE_PALETTE = (
+    (32, 0, 64),
+    (72, 32, 120),
+    (112, 80, 168),
+    (160, 128, 208),
 )
 PORTRAIT_TILE_COLUMNS = 4
 PORTRAIT_TILE_COUNT = PORTRAIT_TILE_COLUMNS ** 2
@@ -123,10 +138,21 @@ KNOWN_LOOKUP_RANGES = (
     (0x17165, 0x17185),
     (0x17725, 0x17937),
 )
+# Exclusive physical-ROM ranges of the title tilemap, its record and pointer tables, and the routines that write and copy them, shaded in purple.
+KNOWN_STRUCTURE_RANGES = (
+    (0x077D, 0x07BC),
+    (0x0A78, 0x0AA1),
+    (0x0AD0, 0x0AD9),
+    (0x0CCB, 0x0CD4),
+    (0x13C30, 0x13D9D),
+    (0x1800A, 0x1800C),
+    (0x18110, 0x1811E),
+)
 HIGHLIGHT_PALETTES = {
     "graphics": BLUESCALE_PALETTE,
     "text": YELLOWSCALE_PALETTE,
     "lookup": GREENSCALE_PALETTE,
+    "structure": PURPLESCALE_PALETTE,
 }
 
 
@@ -137,6 +163,8 @@ def known_kind(address: int) -> str | None:
         return "text"
     if any(start <= address < end for start, end in KNOWN_LOOKUP_RANGES):
         return "lookup"
+    if any(start <= address < end for start, end in KNOWN_STRUCTURE_RANGES):
+        return "structure"
     return None
 
 
@@ -253,12 +281,15 @@ def add_address_axes(
         (255, 255, 255),
     )
 
-    for image_index in range(image_count):
-        source_x = image_index % columns * source_pitch_x
-        source_y = image_index // columns * source_pitch_y
-        sprite = image.crop((source_x, source_y, source_x + cell_width, source_y + cell_height))
+    for image_index in range(rows * columns):
         target_x = left_margin + image_index % columns * column_pitch
         target_y = top_margin + image_index // columns * row_pitch
+        if image_index < image_count:
+            source_x = image_index % columns * source_pitch_x
+            source_y = image_index // columns * source_pitch_y
+            sprite = image.crop((source_x, source_y, source_x + cell_width, source_y + cell_height))
+        else:
+            sprite = Image.new("RGB", (cell_width, cell_height), EMPTY_COLOR)
         output.paste(sprite, (target_x, target_y))
 
     draw = ImageDraw.Draw(output)
@@ -332,7 +363,7 @@ def render_tile_grid(
     rows = math.ceil(image_count / columns)
     width = columns * image_width + (columns - 1) * SPRITE_GUTTER
     height = rows * image_height + (rows - 1) * SPRITE_GUTTER
-    image = Image.new("RGB", (width, height), palette[0])
+    image = Image.new("RGB", (width, height), EMPTY_COLOR)
     draw = ImageDraw.Draw(image)
     for column in range(1, columns):
         x = column * (image_width + SPRITE_GUTTER) - SPRITE_GUTTER
@@ -353,6 +384,8 @@ def render_tile_grid(
             TILE_BYTES, b"\x00"
         )
         for y, row in enumerate(tile):
+            if tile_index * TILE_BYTES + y * 2 >= len(data):
+                break
             low_byte, high_byte = tile_data[y * 2:y * 2 + 2]
             row_address = tile_start + y * 2
             low_kind = known_kind(row_address) if highlight_known else None
@@ -451,7 +484,7 @@ def render_stacked_glyphs(
     rows = math.ceil(tile_count / columns)
     width = columns * TILE_WIDTH + (columns - 1) * SPRITE_GUTTER
     height = rows * cell_height + (rows - 1) * SPRITE_GUTTER
-    image = Image.new("RGB", (width, height), palette[3])
+    image = Image.new("RGB", (width, height), EMPTY_COLOR)
     draw = ImageDraw.Draw(image)
     for column in range(1, columns):
         x = column * (TILE_WIDTH + SPRITE_GUTTER) - SPRITE_GUTTER
@@ -464,10 +497,7 @@ def render_stacked_glyphs(
     for tile_index in range(tile_count):
         tile_x = (tile_index % columns) * (TILE_WIDTH + SPRITE_GUTTER)
         tile_y = (tile_index // columns) * (cell_height + SPRITE_GUTTER)
-        # Pad a short final tile with blank rows so it renders like the others.
-        tile_data = data[tile_index * TILE_BYTES:(tile_index + 1) * TILE_BYTES].ljust(
-            TILE_BYTES, b"\xff"
-        )
+        tile_data = data[tile_index * TILE_BYTES:(tile_index + 1) * TILE_BYTES]
         for y, row_byte in enumerate(tile_data):
             row_address = (
                 start_address + tile_index * TILE_BYTES + y if start_address is not None else None
@@ -500,6 +530,63 @@ def render_stacked_glyphs(
     return image
 
 
+def render_banked_sprites(
+    data: bytes,
+    start_address: int,
+    columns: int = 16,
+    scale: int = 4,
+    highlight_known: bool = False,
+) -> Image.Image:
+    """Render sprites with one labeled block per 16 KiB ROM bank, separated by rules.
+
+    Each bank is rendered on its own, so it starts a new row and gets its own address labels.
+    """
+    blocks = []
+    address = start_address
+    end_address = start_address + len(data)
+    while address < end_address:
+        bank = address // ROM_BANK_BYTES
+        block_end = min(end_address, (bank + 1) * ROM_BANK_BYTES)
+        block = render_sprites(
+            data[address - start_address:block_end - start_address],
+            columns,
+            scale,
+            start_address=address,
+            highlight_known=highlight_known,
+        )
+        blocks.append((f"Bank {bank}", block))
+        address = block_end
+
+    font = ImageFont.load_default()
+    _, label_top, _, label_bottom = font.getbbox("Bank 0")
+    header_height = label_bottom - label_top + 2 * BANK_LABEL_PADDING
+    width = max(block.width for _, block in blocks)
+    height = sum(header_height + block.height for _, block in blocks)
+    height += (len(blocks) - 1) * BANK_DIVIDER_HEIGHT
+    output = Image.new("RGB", (width, height), (255, 255, 255))
+    draw = ImageDraw.Draw(output)
+
+    y = 0
+    for index, (label, block) in enumerate(blocks):
+        if index:
+            rule_top = y + BANK_DIVIDER_PADDING
+            draw.rectangle(
+                (0, rule_top, width - 1, rule_top + BANK_DIVIDER_THICKNESS - 1),
+                fill=BANK_DIVIDER_COLOR,
+            )
+            y += BANK_DIVIDER_HEIGHT
+        draw.text(
+            (BANK_LABEL_PADDING, y + BANK_LABEL_PADDING - label_top),
+            label,
+            fill=(0, 0, 0),
+            font=font,
+        )
+        y += header_height
+        output.paste(block, (0, y))
+        y += block.height
+    return output
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("start", type=parse_offset, help="start ROM offset (inclusive)")
@@ -526,7 +613,7 @@ def main() -> int:
     parser.add_argument(
         "--highlight-known",
         action="store_true",
-        help="shade pixels in documented graphics in blue, text in yellow, and lookup or stat tables in green",
+        help="shade pixels in documented graphics in blue, text in yellow, lookup or stat tables in green, and tilemaps, tables, and routines in purple",
     )
     parser.add_argument(
         "--stacked-glyphs",
@@ -588,11 +675,11 @@ def main() -> int:
             )
         else:
             columns = args.columns if args.columns is not None else 16
-            image = render_sprites(
+            image = render_banked_sprites(
                 data,
+                args.start,
                 columns,
                 args.scale,
-                start_address=args.start,
                 highlight_known=args.highlight_known,
             )
         args.output.parent.mkdir(parents=True, exist_ok=True)

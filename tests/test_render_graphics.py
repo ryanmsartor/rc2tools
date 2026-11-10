@@ -43,6 +43,15 @@ def green_count(colors):
     )
 
 
+def purple_count(colors):
+    """Count pixels from a {color: count} mapping that use a purplescale shade."""
+    return sum(
+        count
+        for color, count in colors.items()
+        if color in render_graphics.PURPLESCALE_PALETTE
+    )
+
+
 def color_counts(image):
     return {color: count for count, color in image.getcolors(image.width * image.height)}
 
@@ -115,8 +124,8 @@ class RenderGraphicsTests(unittest.TestCase):
         self.assertEqual(image.size, (16, 16))
         self.assertEqual(image.getpixel((0, 0)), (85, 85, 85))
         self.assertEqual(image.getpixel((0, 8)), (170, 170, 170))
-        self.assertEqual(image.getpixel((8, 0)), (0, 0, 0))
-        self.assertEqual(image.getpixel((16 - 1, 0)), (0, 0, 0))
+        self.assertEqual(image.getpixel((8, 0)), render_graphics.EMPTY_COLOR)
+        self.assertEqual(image.getpixel((16 - 1, 0)), render_graphics.EMPTY_COLOR)
 
     def test_highlights_only_rows_inside_known_sprite_ranges(self):
         tile = bytes([0xFF, 0]) * 8
@@ -170,7 +179,7 @@ class RenderGraphicsTests(unittest.TestCase):
     def test_known_kind_covers_chest_through_npc_block(self):
         self.assertEqual(render_graphics.known_kind(0x1811E), "graphics")
         self.assertEqual(render_graphics.known_kind(0x1861D), "graphics")
-        self.assertIsNone(render_graphics.known_kind(0x1811D))
+        self.assertEqual(render_graphics.known_kind(0x1811D), "structure")
         self.assertEqual(render_graphics.known_kind(0x1861E), "graphics")
         self.assertEqual(render_graphics.known_kind(0x18A1D), "graphics")
         self.assertEqual(render_graphics.known_kind(0x18A1E), "graphics")
@@ -401,6 +410,26 @@ class RenderGraphicsTests(unittest.TestCase):
         self.assertEqual(render_graphics.known_kind(0x17725), "lookup")
         self.assertEqual(render_graphics.known_kind(0x17936), "lookup")
         self.assertIsNone(render_graphics.known_kind(0x17937))
+
+    def test_title_tilemap_routines_and_tables_are_highlighted_as_structure(self):
+        tile = bytes([0xFF] * render_graphics.TILE_BYTES)
+        image = render_graphics.render_tile_grid(
+            tile, 1, 1, columns=1, scale=1, start_address=0x13C30, highlight_known=True
+        )
+        self.assertEqual(purple_count(color_counts(image)), 64)
+        self.assertEqual(render_graphics.known_kind(0x13C30), "structure")
+        self.assertEqual(render_graphics.known_kind(0x13D9C), "structure")
+        self.assertIsNone(render_graphics.known_kind(0x13D9D))
+        self.assertEqual(render_graphics.known_kind(0x0A78), "structure")
+        self.assertEqual(render_graphics.known_kind(0x0AA0), "structure")
+        self.assertIsNone(render_graphics.known_kind(0x0AA1))
+        self.assertEqual(render_graphics.known_kind(0x077D), "structure")
+        self.assertIsNone(render_graphics.known_kind(0x077C))
+        self.assertEqual(render_graphics.known_kind(0x0CCB), "structure")
+        self.assertIsNone(render_graphics.known_kind(0x0CD4))
+        self.assertEqual(render_graphics.known_kind(0x1800A), "structure")
+        self.assertIsNone(render_graphics.known_kind(0x1800C))
+        self.assertEqual(render_graphics.known_kind(0x1811E), "graphics")
 
     def test_mixed_planes_use_the_plane_that_owns_each_pixel(self):
         # Low byte is graphics, high byte is text: pixels from each plane take that shade.
@@ -633,6 +662,37 @@ class RenderGraphicsTests(unittest.TestCase):
                 self.assertEqual(render_graphics.main(), 0)
             with Image.open(output_path) as image:
                 self.assertEqual(image.format, "JPEG")
+
+    def test_banked_sprites_split_at_rom_bank_boundaries(self):
+        data = b"\xff" * 0x20
+        image = render_graphics.render_banked_sprites(data, 0x3FF0, columns=1, scale=1)
+        bank_zero = render_graphics.render_sprites(data[:0x10], 1, 1, start_address=0x3FF0)
+        bank_one = render_graphics.render_sprites(data[0x10:], 1, 1, start_address=0x4000)
+        header = (
+            image.height - bank_zero.height - bank_one.height - render_graphics.BANK_DIVIDER_HEIGHT
+        ) // 2
+        bank_one_top = bank_zero.height + header * 2 + render_graphics.BANK_DIVIDER_HEIGHT
+        self.assertEqual(image.size[0], max(bank_zero.width, bank_one.width))
+        self.assertEqual(
+            image.crop((0, bank_one_top, bank_one.width, bank_one_top + bank_one.height)).tobytes(),
+            bank_one.tobytes(),
+        )
+
+    def test_banked_sprites_draw_labels_and_full_width_dividers(self):
+        image = render_graphics.render_banked_sprites(b"\xff" * 0xC000, 0, columns=16, scale=1)
+        full_black_rows = [
+            y for y in range(image.height)
+            if all(image.getpixel((x, y)) == render_graphics.BANK_DIVIDER_COLOR for x in range(image.width))
+        ]
+        self.assertEqual(len(full_black_rows), 2 * render_graphics.BANK_DIVIDER_THICKNESS)
+        header_pixels = [image.getpixel((x, y)) for y in range(full_black_rows[0]) for x in range(40)]
+        self.assertTrue(any(sum(pixel) < 200 for pixel in header_pixels))
+
+    def test_empty_sprite_cells_render_lilac(self):
+        image = render_graphics.render_sprites(bytes([0xFF, 0]) * 8, columns=2, scale=1)
+        self.assertEqual(image.size, (33, 16))
+        self.assertEqual(image.getpixel((20, 4)), render_graphics.EMPTY_COLOR)
+        self.assertEqual(image.getpixel((8, 0)), render_graphics.EMPTY_COLOR)
 
 
 if __name__ == "__main__":

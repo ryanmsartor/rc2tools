@@ -1,3 +1,4 @@
+import importlib.util
 import shutil
 import subprocess
 import tempfile
@@ -39,9 +40,22 @@ class RenderGraphicsWrapperTests(unittest.TestCase):
     def test_default_renders_entire_rom(self):
         result = self.run_wrapper("render-graphics")
         self.assertEqual(result.returncode, 0, result.stderr)
+        rom = (self.root / "input" / "Rolan's Curse II (USA).gb").read_bytes()
+        spec = importlib.util.spec_from_file_location(
+            "render_graphics", self.root / "bin" / "render_graphics.py"
+        )
+        render_graphics = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(render_graphics)
         with Image.open(self.root / "output" / "graphics.png") as image:
-            self.assertEqual(image.size, (1135, 8716))
-            self.assertEqual(image.getpixel((1103, 8684)), (85, 85, 85))
+            self.assertEqual(image.size, (1135, 9054))
+            bank_seven = render_graphics.render_sprites(
+                rom[0x1C000:0x20000], 16, 4, start_address=0x1C000
+            )
+            bank_seven_top = 7 * (bank_seven.height + 16 + 18) + 16
+            self.assertEqual(
+                image.crop((0, bank_seven_top, bank_seven.width, bank_seven_top + bank_seven.height)).tobytes(),
+                bank_seven.tobytes(),
+            )
 
     def test_arguments_and_options_are_forwarded(self):
         output = self.root / "tiles with spaces.png"
@@ -52,8 +66,8 @@ class RenderGraphicsWrapperTests(unittest.TestCase):
         )
         self.assertEqual(result.returncode, 0, result.stderr)
         with Image.open(output) as image:
-            self.assertEqual(image.size, (59, 32))
-            self.assertEqual(image.getpixel((43, 16)), (85, 85, 85))
+            self.assertEqual(image.size, (59, 48))
+            self.assertEqual(image.getpixel((43, 32)), (85, 85, 85))
 
     def test_highlight_known_works_with_default_full_rom_range(self):
         result = self.run_wrapper("render-graphics", "--highlight-known", "--scale", "1")

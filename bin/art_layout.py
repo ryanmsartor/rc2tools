@@ -15,8 +15,10 @@ TILE_BYTES = 16
 EMPTY_CELL = "--"
 
 # Cells of the title screen's BG map as tile IDs, for the rows above the
-# START/CONTINUE line (row 13). Rows below it hold the menu cursor (sprite 0,
-# tile 0xD4), the menu text, and the copyright tile 0xD3, so they are left out.
+# START/CONTINUE line (row 13). This is the ROM tilemap stream at bank 4
+# 0x7C30 (decoded by bank 0 0x0A78), checked against VRAM at frame 90.
+# Rows below START/CONTINUE hold the menu cursor (sprite 0, tile 0xD4), the
+# menu text, and the copyright tile 0xD3, so they are left out.
 # `--` marks a cell that is not title art.
 TITLE_GRID = """
 30 30 30 30 30 30 30 30 30 30 30 30 30 30 30 30 30 30 30 30

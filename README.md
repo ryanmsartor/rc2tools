@@ -133,7 +133,7 @@ assembled sprites, pass the range and output path:
 ```
 
 Pass `--highlight-known` to shade documented graphics in blue, documented text
-in yellow, and documented lookup or stat tables in green, making unmapped tiles easier to spot. Known pixels keep their relative
+in yellow, documented lookup or stat tables in green, and the title-screen tilemap, its tables, and the routines that write and copy them in purple, making unmapped tiles easier to spot. Known pixels keep their relative
 brightness, so dark, mid, and light pixels stay distinguishable:
 
 ```sh
@@ -171,7 +171,8 @@ The highlighted physical-ROM ranges follow the graphics and text documented in
 even when a range starts or ends inside a rendered tile. A pixel is blue when
 its color data comes only from bytes inside a known graphics range, yellow
 when it comes only from a known text range, and green when it comes only from a
-known lookup-table range. If only one of a tile row's two
+known lookup-table range, and purple when it comes only from a known structure
+range (the title tilemap, its tables, and the routines that write and copy them). If only one of a tile row's two
 bitplane bytes is known, only pixels attributable to that byte are shaded.
 Portrait, sprite, and custom tile-grid layouts all use the same ranges.
 
@@ -214,8 +215,10 @@ Stacked-glyph mode cannot be combined with `--tile-grid` or `--mode`.
 
 The default sprite sheet uses 16 sprites per row. Its grayscale palette
 displays transparent color index 0 as black, while the inverted
-non-transparent palette displays index 3 as white. Portrait mode uses the
-grayscale palette observed on the POW screen.
+non-transparent palette displays index 3 as white. Empty cells, such as the
+missing quadrants of an incomplete sprite, are filled with lilac so they are
+not confused with real white data. Portrait mode uses the grayscale palette
+observed on the POW screen.
 The output extension can be `.png`, `.jpg`, or `.jpeg`. Options include
 `--input` for a different ROM or full hex dump, `--columns` for images per
 row, `--scale` for nearest-neighbor enlargement, and `--highlight-known` to
@@ -223,7 +226,10 @@ mark documented sprite areas. The specified output file is overwritten if it
 exists. You can also invoke
 `python3 bin/render_graphics.py` directly with the same range, output path,
 and options. When run without a range, `./rc2t render-graphics` applies the
-default sprite grouping to the entire ROM, including non-graphics data.
+default sprite grouping to the entire ROM, including non-graphics data. That
+sheet is split into one block per 16 KiB ROM bank, labeled `Bank N` and
+separated by a horizontal rule. Each bank starts a new row and has its own
+address labels. Ranges that span several banks use the same layout.
 
 ## Hack the ROM
 
