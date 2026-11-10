@@ -678,6 +678,30 @@ The range `0x1861E-0x18A1D` (1,024 bytes, 16 2×2 sprites of 64 bytes each) appe
 | Chicken | `0x1891E-0x1895D` | `0x1895E-0x1899D` |
 | Frog | `0x1899E-0x189DD` | `0x189DE-0x18A1D` |
 
+#### Egghead and dog duplicates (investigation)
+
+Egghead and dog each appear twice in the input ROM. The other six idle NPCs have no second copy. All four 64-byte frames match byte for byte:
+
+| Sprite | Idle NPC copy | Enemy copy |
+|---|---|---|
+| Egghead frame 1 | `0x1869E` | `0x0E25A` |
+| Egghead frame 2 | `0x186DE` | `0x0E29A` |
+| Dog frame 1 | `0x1889E` | `0x0E2DA` |
+| Dog frame 2 | `0x188DE` | `0x0E31A` |
+
+Static reference scan of the input ROM (read-only):
+
+- **Enemy copies are referenced.** Each is the source of a VRAM-load record. A record is six bytes: a little-endian VRAM destination, a byte length, and a CPU source address. This layout was inferred from neighboring records and has not been checked against the code that reads them.
+  - Dog record at `0x0C3BE`: destination `0x8200`, length `0x0080`, source `0x62DA`. It is part of a six-record list at `0x0C3BE-0x0C3E1`.
+  - Egghead record at `0x0C434`: destination `0x8200`, length `0x0080`, source `0x625A`. It is part of a four-record list at `0x0C434-0x0C44B`.
+  - Length `0x80` is 128 bytes, which is two 64-byte frames, matching the two-frame animation.
+- **Idle copies are not referenced directly.** No pointer in the ROM holds their CPU addresses (`0x469E`, `0x489E`). They may be reached through computed addressing, or they may be unused.
+- **The list starts have no direct pointers.** The lists are reached indirectly. The routine that reads them has not been found.
+
+Status: unresolved. It is not known whether the idle copies are used, whether either copy is dead, or which list runs in each context. A runtime read trace in an emulator would settle this. The existing trace scripts use PyBoy, which is not installed in this environment. The scan scripts are in the gitignored `scratch/rom-trace/` folder (`npc_refs.py` and `vram_records.py`).
+
+For art tooling, the NPC sheet dumps only the enemy copies, and `inject-art npc` writes each edited frame to both copies.
+
 ### Boss sprites (tentative)
 
 The range `0x18A1E-0x1A6AD` (7,312 bytes, exactly 457 16-byte 2bpp tiles) holds the bosses of the game. The rendered sample shows large tile artwork rather than code or text. It is marked as known in `--highlight-known`.

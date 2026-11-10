@@ -10,7 +10,6 @@ from PIL import Image
 
 from art_layout import ART_LAYOUTS, apply_art, render_art
 from character_art import apply_character_art, render_character_art
-from npc_art import render_npc_art
 from npc_art import apply_npc_art, render_npc_art
 from swap_character_sprite import CHARACTER_SPRITES, swap_character_sprites
 

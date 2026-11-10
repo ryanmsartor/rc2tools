@@ -15,8 +15,18 @@ from render_graphics import (
 SPRITE_BYTES = 64
 SPRITE_SIZE = 16
 SEPARATOR = (255, 0, 0)
-COLUMNS = 6
+COLUMNS = 12
 PITCH = SPRITE_SIZE + 1
+
+# Idle NPC frames that are byte-identical to enemy frames. Only the enemy copy is dumped;
+# injection writes the edited bytes to the idle copy as well.
+DUPLICATE_FRAMES = {
+    0x1869E: 0xE25A,
+    0x186DE: 0xE29A,
+    0x1889E: 0xE2DA,
+    0x188DE: 0xE31A,
+}
+
 
 def _entities(start: int, frames: int, count: int) -> list[tuple[int, ...]]:
     """Return each entity's frame offsets; entities are consecutive in ROM."""
@@ -27,21 +37,22 @@ def _entities(start: int, frames: int, count: int) -> list[tuple[int, ...]]:
 
 
 def _layout() -> tuple[list[tuple[int, int, int]], int]:
-    """Place entities in rows so each entity's frames stay together.
+    """Place entities in 12-cell rows so each entity's frames stay together.
 
-    Each four-pose set shares a row with one of the first seven enemy two-frame sets,
-    filling the two cells it would otherwise leave empty. The remaining two-frame sets
-    pack three to a row, and each six-pose set takes its own row.
+    Rows run in three sections: the two-frame sets, then the four-pose sets, then the
+    six-pose sets. The first boundary row holds the last four two-frame sets and one
+    four-pose set, so all 120 cells are used in 10 rows.
     """
-    two_frame = _entities(0x1861E, 2, 8) + _entities(0xE25A, 2, 28)
+    idle = [entity for entity in _entities(0x1861E, 2, 8) if entity[0] not in DUPLICATE_FRAMES]
+    enemy = _entities(0xE25A, 2, 28)
     four_pose = _entities(0xF05A, 4, 7)
     six_pose = _entities(0xF75A, 6, 4)
-    paired = two_frame[8:15]
-    unpaired = two_frame[:8] + two_frame[15:]
 
-    rows = [unpaired[index:index + 3] for index in range(0, len(unpaired), 3)]
-    rows += [[four, two] for four, two in zip(four_pose, paired)]
-    rows += [[six] for six in six_pose]
+    two_frame = idle + enemy
+    rows = [two_frame[index:index + 6] for index in range(0, 30, 6)]
+    rows.append(two_frame[30:] + four_pose[0:1])
+    rows += [four_pose[1:4], four_pose[4:7]]
+    rows += [six_pose[0:2], six_pose[2:4]]
 
     placements = []
     for row_index, row in enumerate(rows):
@@ -90,3 +101,6 @@ def apply_npc_art(rom: bytearray, image: Image.Image) -> None:
             ]
             start = offset + tile * TILE_BYTES
             rom[start:start + TILE_BYTES] = _encode_tile(pixels)
+
+    for duplicate, original in DUPLICATE_FRAMES.items():
+        rom[duplicate:duplicate + SPRITE_BYTES] = rom[original:original + SPRITE_BYTES]
