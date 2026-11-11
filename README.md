@@ -316,9 +316,10 @@ sprite and level-up face below it. Red lines and padding separate the images.
 `inject-art <character>` reads the corresponding 84×50 PNG and replaces only
 that character's nine standard poses, defeated sprite, level-up face, and POW
 portrait in the in-progress ROM. Pixel colors are converted to grayscale and
-mapped to the nearest shade of the relevant dump palette (the sprite and POW
-portrait palettes differ). Sprite palette index 0 is transparent in-game.
-Red separators and padding are ignored, and image transparency is not used.
+mapped to the nearest of the four hack-art shades (index 0 is light gray and
+transparent in-game for sprites, 1 is black, 2 is dark gray, and 3 is white). POW
+portraits keep their original palette. Red separators and padding are ignored, and
+image transparency is not used.
 
 `dump-art title` writes the title screen's logo above the START/CONTINUE line to
 `working/title-art.png`. The image is 160×88 pixels: the art's 11 rows of

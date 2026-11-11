@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "bin"))
 
 from character_art import apply_character_art, render_character_art  # noqa: E402
-from render_graphics import DEFAULT_PALETTE, PORTRAIT_PALETTE  # noqa: E402
+from render_graphics import DEFAULT_PALETTE, HACK_ART_PALETTE, PORTRAIT_PALETTE  # noqa: E402
 from swap_character_sprite import CHARACTER_SPRITES, SPRITE_BYTES  # noqa: E402
 
 
@@ -40,7 +40,7 @@ class CharacterArtTests(unittest.TestCase):
                 x, y = 51 + (cell - 9) * 17, 34
             colors = (index % 4, index // 4, (index + 1) % 4, (index + 2) % 4)
             for tile, (dx, dy) in enumerate(((0, 0), (0, 8), (8, 0), (8, 8))):
-                self.assertEqual(image.getpixel((x + dx, y + dy)), DEFAULT_PALETTE[colors[tile]])
+                self.assertEqual(image.getpixel((x + dx, y + dy)), HACK_ART_PALETTE[colors[tile]])
         for tile in range(16):
             self.assertEqual(
                 image.getpixel((51 + (tile % 4) * 8, (tile // 4) * 8)),
@@ -86,8 +86,8 @@ class CharacterArtTests(unittest.TestCase):
                     y = (cell // 3) * 17 if cell < 9 else 34
                     for tile, (dx, dy) in enumerate(((0, 0), (0, 8), (8, 0), (8, 8))):
                         tile_offset = offset + tile * 16
-                        color = (DEFAULT_PALETTE.index(image.getpixel((x + dx, y + dy))) + 1) % 4
-                        image.putpixel((x + dx, y + dy), DEFAULT_PALETTE[color])
+                        color = (HACK_ART_PALETTE.index(image.getpixel((x + dx, y + dy))) + 1) % 4
+                        image.putpixel((x + dx, y + dy), HACK_ART_PALETTE[color])
                         expected[tile_offset] = (expected[tile_offset] & 0x7F) | ((color & 1) << 7)
                         expected[tile_offset + 1] = (expected[tile_offset + 1] & 0x7F) | ((color >> 1) << 7)
                 for tile in range(16):
@@ -109,7 +109,7 @@ class CharacterArtTests(unittest.TestCase):
         image.putpixel((51, 0), (90, 90, 90))
         apply_character_art(rom, "hero", image)
         result = render_character_art(rom, "hero")
-        self.assertEqual(result.getpixel((0, 0)), DEFAULT_PALETTE[1])
+        self.assertEqual(result.getpixel((0, 0)), HACK_ART_PALETTE[2])
         self.assertEqual(result.getpixel((51, 0)), PORTRAIT_PALETTE[2])
 
     def test_inject_invalid_inputs_do_not_change_rom(self):

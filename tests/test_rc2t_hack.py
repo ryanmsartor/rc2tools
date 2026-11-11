@@ -367,7 +367,7 @@ class HackWrapperTests(unittest.TestCase):
                 self.assertEqual(result.returncode, 0, result.stderr)
                 with Image.open(self.root / "working" / f"{character}-art.png") as image:
                     self.assertEqual(image.size, (84, 50))
-                    shade = (index % 4) * 85
+                    shade = (170, 0, 85, 255)[index % 4]
                     self.assertEqual(image.getpixel((0, 0)), (shade, shade, shade))
         self.assertEqual(self.working.read_bytes(), bytes(rom))
         self.assertEqual(self.hacks_log.read_text(), "")
@@ -464,7 +464,8 @@ class HackWrapperTests(unittest.TestCase):
                     text=True,
                 )
                 self.assertEqual(result.returncode, 0, result.stderr)
-                expected[offset] = 0x80
+                # (85, 85, 85) is palette index 2, which sets the high bit plane.
+                expected[offset + 1] = 0x80
                 self.assertEqual(self.working.read_bytes(), expected)
         self.assertEqual(
             self.hacks_log.read_text(),

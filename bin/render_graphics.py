@@ -226,6 +226,13 @@ PORTRAIT_PALETTE = (
     (96, 96, 96),
     (248, 248, 248),
 )
+# Used by the hack dump-art and inject-art commands for NPC and character sprites; index 0 is transparent.
+HACK_ART_PALETTE = (
+    (170, 170, 170),
+    (0, 0, 0),
+    (85, 85, 85),
+    (255, 255, 255),
+)
 
 
 def parse_offset(value: str) -> int:

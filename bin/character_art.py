@@ -5,6 +5,7 @@ from PIL import Image, ImageDraw
 from art_layout import _encode_tile
 from render_graphics import (
     DEFAULT_PALETTE,
+    HACK_ART_PALETTE,
     PORTRAIT_PALETTE,
     SPRITE_TILE_POSITIONS,
     TILE_BYTES,
@@ -44,9 +45,10 @@ def render_character_art(rom: bytes, character: str) -> Image.Image:
     draw.line((67, 34, 67, 49), fill=(255, 0, 0))
 
     for index, offset in enumerate(offsets):
-        sprite = render_sprites(rom[offset:offset + SPRITE_BYTES], columns=1, scale=1)
+        sprite = render_sprites(rom[offset:offset + SPRITE_BYTES], columns=1, scale=1, palette=HACK_ART_PALETTE)
         image.paste(sprite, _sprite_position(index))
-    image.paste(render_portraits(rom[portrait:portrait + POW_PORTRAIT_BYTES], columns=1, scale=1), (51, 0))
+    portrait_image = render_portraits(rom[portrait:portrait + POW_PORTRAIT_BYTES], columns=1, scale=1)
+    image.paste(portrait_image, (51, 0))
     return image
 
 
@@ -70,7 +72,7 @@ def apply_character_art(rom: bytearray, character: str, image: Image.Image) -> N
 
     for index, offset in enumerate(offsets):
         x, y = _sprite_position(index)
-        encode_tiles(offset, x, y, SPRITE_TILE_POSITIONS, DEFAULT_PALETTE)
+        encode_tiles(offset, x, y, SPRITE_TILE_POSITIONS, HACK_ART_PALETTE)
     portrait_positions = tuple((index % 4, index // 4) for index in range(16))
     encode_tiles(portrait, 51, 0, portrait_positions, PORTRAIT_PALETTE)
 

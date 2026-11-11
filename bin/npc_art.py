@@ -4,7 +4,7 @@ from PIL import Image
 
 from art_layout import _encode_tile
 from render_graphics import (
-    DEFAULT_PALETTE,
+    HACK_ART_PALETTE,
     SPRITE_TILE_POSITIONS,
     TILE_BYTES,
     TILE_WIDTH,
@@ -76,7 +76,7 @@ def render_npc_art(rom: bytes) -> Image.Image:
     placements, size = _sheet(len(rom))
     image = Image.new("RGB", size, SEPARATOR)
     for offset, column, row in placements:
-        sprite = render_sprites(rom[offset:offset + SPRITE_BYTES], columns=1, scale=1)
+        sprite = render_sprites(rom[offset:offset + SPRITE_BYTES], columns=1, scale=1, palette=HACK_ART_PALETTE)
         image.paste(sprite, (column * PITCH, row * PITCH))
     return image
 
@@ -88,7 +88,7 @@ def apply_npc_art(rom: bytearray, image: Image.Image) -> None:
         width, height = size
         raise ValueError(f"expected a {width}x{height} image, got {image.width}x{image.height}")
     gray = image.convert("L")
-    shades = [color[0] for color in DEFAULT_PALETTE]
+    shades = [color[0] for color in HACK_ART_PALETTE]
     lut = [min(range(len(shades)), key=lambda index: abs(shades[index] - level)) for level in range(256)]
 
     for offset, column, row in placements:
