@@ -14,7 +14,7 @@ DEFAULT_SHEET_SIZE = (84, 50)
 HERO_ARC_START = 0x9406
 SHEET_SIZES = {
     "hero": (118, 67), "pit": (84, 84), "lane": (84, 67), "kyle": (84, 93),
-    "jude": (135, 50), "lee": (84, 93), "lora": (84, 84), "zold": (84, 84),
+    "jude": (135, 50), "lee": (84, 93), "lora": (84, 76), "zold": (84, 84),
 }
 
 
@@ -90,15 +90,13 @@ LEE_ATTACK_FIGURES = (
 )
 LORA_ATTACK_FIGURES = (
     (Piece(0xAF06, 1, 2),),
-    (Piece(0xAF26, 2, 1),),
     (Piece(0xAF46, 2, 2),),
     (Piece(0xAF86, 2, 2),),
     (Piece(0xAFC6, 2, 2),),
     (Piece(0xB006, 2, 2),),
+    (Piece(0xAF26, 2, 1),),
     (Piece(0xB046, 2, 1),),
-    (Piece(0xB066, 2, 1),),
     (Piece(0xB086, 1, 1),),
-    (Piece(0xB096, 1, 1),),
 )
 ZOLD_ATTACK_FIGURES = (
     (Piece(0xB326, 2, 2),),

@@ -29,6 +29,7 @@ rc2t_print_help_message() {
     echo "    dump-art <name|all>               Export title, character, or NPC art to working/<name>-art.png"
     echo "    inject-art <name|all>             Apply working/<name>-art.png to the in-progress hack"
     echo "    dump-stats [rom-or-hex]           Write character stat arrays to working/stats.txt"
+    echo "    inject-stats                      Apply modified arrays from working/stats.txt"
 }
 
 _check_if_rom_exists() {

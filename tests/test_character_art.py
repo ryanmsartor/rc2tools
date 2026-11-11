@@ -130,6 +130,44 @@ class CharacterArtTests(unittest.TestCase):
                 apply_character_art(rom, character, render_character_art(original, character))
                 self.assertEqual(rom, original)
 
+    def test_lora_attack_layout_and_injection(self):
+        figures = (
+            (0xAF06, 1, 2, 4, 51),
+            (0xAF46, 2, 2, 17, 51),
+            (0xAF86, 2, 2, 34, 51),
+            (0xAFC6, 2, 2, 51, 51),
+            (0xB006, 2, 2, 68, 51),
+            (0xAF26, 2, 1, 0, 68),
+            (0xB046, 2, 1, 17, 68),
+            (0xB086, 1, 1, 38, 68),
+        )
+        original = bytearray(random.Random(101).randbytes(0x20000))
+        for offset, columns, rows, _, _ in figures:
+            for index in range(columns * rows):
+                start = offset + index * TILE_BYTES
+                original[start:start + TILE_BYTES] = id_tile(start & 0xFFFF)
+
+        image = render_character_art(original, "lora")
+        self.assertEqual(image.size, (84, 76))
+        expected = bytearray(original)
+        for offset, columns, rows, x, y in figures:
+            for index in range(columns * rows):
+                tile_column, tile_row = divmod(index, rows)
+                px, py = x + tile_column * 8, y + tile_row * 8
+                start = offset + index * TILE_BYTES
+                self.assertEqual(read_tile_id(image, px, py), start & 0xFFFF)
+                image.paste(HACK_ART_PALETTE[3], (px, py, px + 8, py + 8))
+                expected[start:start + TILE_BYTES] = solid_tile(3)
+
+        for x, y in ((34, 68), (46, 68), (51, 68), (68, 68)):
+            self.assertEqual(image.getpixel((x, y)), (255, 0, 0))
+            image.putpixel((x, y), (0, 0, 0))
+        rom = bytearray(original)
+        apply_character_art(rom, "lora", image)
+        self.assertEqual(rom, expected)
+        self.assertEqual(rom[0xB066:0xB086], original[0xB066:0xB086])
+        self.assertEqual(rom[0xB096:0xB0A6], original[0xB096:0xB0A6])
+
     def test_inject_maps_every_tile_and_ignores_separators(self):
         original = random.Random(41).randbytes(0x20000)
         for character, (standard, defeated, face, portrait) in CHARACTER_SPRITES.items():
@@ -187,8 +225,8 @@ class CharacterArtTests(unittest.TestCase):
 # Attack and particle sprites sit between the hero's defeated sprite and Zold's defeated sprite.
 ATTACK_START = 0x95C6
 ATTACK_END = 0xB566
-# The lightning sprite's two transparent right-hand tiles, which the dump and injection drop.
-DROPPED_TRANSPARENT_TILES = (0xA1E6, 0xA206)
+# Transparent tiles omitted by dump and injection.
+DROPPED_TRANSPARENT_RANGES = ((0xA1E6, 0xA206), (0xB066, 0xB086), (0xB096, 0xB0A6))
 
 
 def _attack_pieces():
@@ -221,7 +259,7 @@ class AttackArtCoverageTests(unittest.TestCase):
         for start, end in self.spans:
             covered.update(range(start, end))
         expected = set(range(ATTACK_START, ATTACK_END))
-        for start, end in _character_sprite_ranges() + [DROPPED_TRANSPARENT_TILES]:
+        for start, end in _character_sprite_ranges() + list(DROPPED_TRANSPARENT_RANGES):
             expected.difference_update(range(start, end))
         self.assertEqual(covered, expected)
 

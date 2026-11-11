@@ -14,7 +14,7 @@ from character_art import apply_character_art, render_character_art
 from font_art import apply_font_art, render_font_art
 from npc_art import apply_npc_art, render_npc_art
 from rom_io import read_rom
-from rom_stats import format_stats, read_stats
+from rom_stats import apply_stats, format_stats, parse_stats, read_stats
 from swap_character_sprite import CHARACTER_SPRITES, swap_character_sprites
 
 
@@ -201,6 +201,26 @@ def dump_stats(source: Path) -> None:
     print(f"Wrote {output}")
 
 
+def inject_stats() -> None:
+    path = WORKING_DIR / "stats.txt"
+    stats, unknown = parse_stats(path.read_text(encoding="utf-8"))
+    for name in unknown:
+        print(f"Unknown stat array: {name}")
+    stock = dict(read_stats(read_rom(INPUT_ROM_PATH)))
+    rom = bytearray(read_rom(WORKING_ROM_PATH))
+    current = dict(read_stats(rom))
+    changes = {
+        name: values for name, values in stats.items()
+        if values != stock[name] and values != current[name]
+    }
+    if changes:
+        apply_stats(rom, changes)
+        WORKING_ROM_PATH.write_bytes(rom)
+        for name, values in changes.items():
+            record_hack(f"inject-stats {name}: [{', '.join(map(str, values))}]")
+    print(f"Applied {len(changes)} stat array(s) from {path}")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(prog="rc2t hack", description=__doc__)
     subparsers = parser.add_subparsers(dest="subcommand", required=True, metavar="<subcommand>")
@@ -245,6 +265,10 @@ def main() -> int:
         "source", nargs="?", default=WORKING_ROM_PATH, type=Path,
         help="ROM (.gb) or full hex dump (.hex) to read (default: the in-progress hack)",
     )
+    subparsers.add_parser(
+        "inject-stats",
+        help="apply modified arrays from working/stats.txt to the in-progress hack",
+    )
     argv = sys.argv[1:]
     # Accept the original command name without listing it in help.
     if argv[:1] == [SWAP_ALIAS]:
@@ -277,6 +301,8 @@ def main() -> int:
             record_hack("inject-font")
         elif args.subcommand == "dump-stats":
             dump_stats(args.source)
+        elif args.subcommand == "inject-stats":
+            inject_stats()
     except (OSError, ValueError) as error:
         print(f"Error: {error}", file=sys.stderr)
         return 1

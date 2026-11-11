@@ -260,6 +260,7 @@ or `--help`, to see its commands.
 ./rc2h dump-font                       # synonym for dump-art font
 ./rc2h inject-font                     # synonym for inject-art font
 ./rc2h dump-stats [rom-or-hex]         # write character stat arrays to working/stats.txt
+./rc2h inject-stats                    # apply modified arrays from working/stats.txt
 ```
 
 Both `dump-art` and `inject-art` accept the same names:
@@ -298,6 +299,18 @@ instead. It checks the ROM size and header, not a fixed hash or expected stat va
 It does not record anything in `hacks.txt`. The mappings and their unresolved
 interpretations are documented in [the ROM map](docs/rom-map.md).
 
+`inject-stats` reads `working/stats.txt`, accepting whitespace around names,
+punctuation, and values, including line breaks within arrays. Each recognized array
+must have 16 decimal byte values (0–255); duplicate recognized names and malformed
+entries are errors. Unknown array names are printed and ignored. Omitted arrays
+remain unchanged. Arrays matching the original `input/` ROM are skipped even if
+the working ROM differs; arrays already matching the working ROM are also skipped.
+Each array actually changed is recorded with its new values in `hacks.txt`.
+To restore stock values, use `reset` (which also discards other working changes).
+Some stat array names have been renamed; older files must be updated before injection
+because old names are reported as unknown and ignored. Re-dump only if replacing
+any edits in the existing file is acceptable.
+
 Character names for `swap-char-sprite` are `hero`, `pit`, `lane`, `kyle`,
 `jude`, `lee`, `lora`, and `zold`. The swap exchanges the nine standard poses,
 defeat sprite, level-up face, and POW-screen portrait of the two characters.
@@ -305,7 +318,9 @@ defeat sprite, level-up face, and POW-screen portrait of the two characters.
 `dump-art <character>` exports one character's sprites, including its poses, POW
 portrait, defeat sprite, level-up face, and attack and particle sprites. `inject-art
 <character>` writes them back. The hero's sheet also includes its sword and
-electric-ball sprites.
+electric-ball sprites. Lora's sheet omits the transparent tiles beside her
+shadow and healing particle; injection leaves those ROM bytes unchanged. Older
+Lora sheets use a different layout and must be re-created before injection.
 
 `dump-art abilities` exports the in-UI weapon and ability icons. `inject-art
 abilities` writes them back.
@@ -319,7 +334,8 @@ and changes nothing if the image is the wrong size, or if tiles that appear in m
 than one place disagree.
 
 Each applied hack is recorded in `working/hacks.txt`, one line per hack. `reset`
-and `clear` delete this file, and `swap-char-sprite`, `inject-art`, and `inject-font` append to it.
+and `clear` delete this file, and `swap-char-sprite`, `inject-art`, `inject-font`,
+and `inject-stats` append to it.
 `finalize` does not copy it to `output/`.
 
 `finalize` writes `output/Rolan's Curse II (USA) (hack finalized).gb` and

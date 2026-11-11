@@ -363,7 +363,7 @@ class HackWrapperTests(unittest.TestCase):
                 with Image.open(self.root / "working" / f"{character}-art.png") as image:
                     expected = {
                         "hero": (118, 67), "pit": (84, 84), "lane": (84, 67), "kyle": (84, 93),
-                        "jude": (135, 50), "lee": (84, 93), "lora": (84, 84), "zold": (84, 84),
+                        "jude": (135, 50), "lee": (84, 93), "lora": (84, 76), "zold": (84, 84),
                     }
                     self.assertEqual(image.size, expected.get(character, (84, 50)))
                     shade = (170, 0, 85, 255)[index % 4]
@@ -485,7 +485,7 @@ class HackWrapperTests(unittest.TestCase):
             sizes = {
                 "title": (160, 88), "npc": (203, 169), "hero": (118, 67),
                 "pit": (84, 84), "lane": (84, 67), "kyle": (84, 93),
-                "jude": (135, 50), "lee": (84, 93), "lora": (84, 84), "zold": (84, 84),
+                "jude": (135, 50), "lee": (84, 93), "lora": (84, 76), "zold": (84, 84),
                 "abilities": (101, 67), "font": (53, 71),
             }
             self.assertEqual(edited.size, sizes.get(name, (84, 50)))
@@ -763,6 +763,86 @@ class HackWrapperTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("expected a 131072-byte ROM", result.stderr)
         self.assertFalse((self.root / "working" / "stats.txt").exists())
+
+    def test_inject_stats_partial_stock_unknown_and_repeat(self):
+        stock = blank_rom(header=True)
+        self.use_input_rom(bytes(stock))
+        self.assertEqual(self.run_wrapper("reset").returncode, 0)
+        working = bytearray(stock)
+        working[0x17065:0x17075] = bytes([7] * 16)
+        working[0x170E5:0x170F5] = bytes([9] * 16)
+        working[0x15459:0x1545C] = bytes([3, 4, 5])
+        self.working.write_bytes(working)
+        stats = self.root / "working" / "stats.txt"
+        stats.write_text(
+            "unknown_array : [anything]\n"
+            "hero_hp : [" + ", ".join(["0"] * 16) + "]\n"
+            "hero_electricball_range : [\n" + ",\n".join(str(i + 10) for i in range(16)) + "]\n"
+            "hero_mp : [" + ",".join(["9"] * 16) + "]\n",
+            encoding="utf-8",
+        )
+        result = self.run_wrapper("inject-stats")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("unknown_array", result.stdout)
+        expected = bytearray(working)
+        for level in range(16):
+            expected[0x15459 + level * 3 + 1] = level + 10
+        self.assertEqual(self.working.read_bytes(), expected)
+        self.assertEqual(
+            self.hacks_log.read_text(),
+            "inject-stats hero_electricball_range: [" + ", ".join(str(i + 10) for i in range(16)) + "]\n",
+        )
+        result = self.run_wrapper("inject-stats")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self.working.read_bytes(), expected)
+        self.assertEqual(len(self.hacks_log.read_text().splitlines()), 1)
+
+    def test_inject_stats_dump_round_trip_and_multiple_changes(self):
+        self.use_input_rom(bytes(blank_rom(header=True)))
+        self.assertEqual(self.run_wrapper("dump-stats").returncode, 0)
+        before = self.working.read_bytes()
+        result = self.run_wrapper("inject-stats")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self.working.read_bytes(), before)
+        self.assertEqual(self.hacks_log.read_text(), "")
+        stats = self.root / "working" / "stats.txt"
+        stats.write_text(
+            "hero_hp:[" + ",".join(["1"] * 16) + "]\n"
+            "lookup_0x17165_table:[" + ",".join(["255"] * 16) + "]\n"
+            "zold_specialblade_damage:[" + ",".join(["8"] * 16) + "]\n",
+            encoding="utf-8",
+        )
+        result = subprocess.run(
+            [str(self.root / "rc2h"), "inject-stats"],
+            cwd=self.root / "input", capture_output=True, text=True,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        expected = bytearray(before)
+        expected[0x17065:0x17075] = bytes([1] * 16)
+        expected[0x17165:0x17175] = bytes([255] * 16)
+        expected[0x15CA6:0x15CB6] = bytes([8] * 16)
+        self.assertEqual(self.working.read_bytes(), expected)
+        self.assertEqual(
+            self.hacks_log.read_text(),
+            "inject-stats hero_hp: [" + ", ".join(["1"] * 16) + "]\n"
+            "inject-stats lookup_0x17165_table: [" + ", ".join(["255"] * 16) + "]\n"
+            "inject-stats zold_specialblade_damage: [" + ", ".join(["8"] * 16) + "]\n",
+        )
+
+    def test_inject_stats_invalid_data_preserves_rom_and_log(self):
+        self.use_input_rom(bytes(blank_rom(header=True)))
+        self.assertEqual(self.run_wrapper("reset").returncode, 0)
+        before = self.working.read_bytes()
+        stats = self.root / "working" / "stats.txt"
+        stats.write_text(
+            "hero_hp:[" + ",".join(["1"] * 16) + "]\nhero_mp: [256]\n",
+            encoding="utf-8",
+        )
+        result = self.run_wrapper("inject-stats")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("hero_mp", result.stderr)
+        self.assertEqual(self.working.read_bytes(), before)
+        self.assertEqual(self.hacks_log.read_text(), "")
 
 
 if __name__ == "__main__":
