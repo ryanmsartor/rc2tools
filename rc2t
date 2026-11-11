@@ -24,7 +24,7 @@ rc2t_print_help_message() {
     echo "  hack <subcommand>  Edit the working/ hack copy:"
     echo "    clear                             Delete the in-progress hack copy and hacks.txt"
     echo "    reset                             Replace the in-progress hack copy with a fresh copy of input/"
-    echo "    finalize [tag]                    Copy the in-progress hack to output/ with an IPS patch"
+    echo "    finalize [tag]                    Copy the hack, IPS patch, and log to output/"
     echo "    swap-char-sprite <char1> <char2>  Swap two characters' sprites and POW portraits"
     echo "    dump-art <name|all>               Export title, character, or NPC art to working/<name>-art.png"
     echo "    inject-art <name|all>             Apply working/<name>-art.png to the in-progress hack"

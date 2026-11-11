@@ -14,7 +14,7 @@ DEFAULT_SHEET_SIZE = (84, 50)
 HERO_ARC_START = 0x9406
 SHEET_SIZES = {
     "hero": (118, 67), "pit": (84, 84), "lane": (84, 67), "kyle": (84, 93),
-    "jude": (135, 50), "lee": (84, 93), "lora": (84, 76), "zold": (84, 84),
+    "jude": (135, 50), "lee": (110, 67), "lora": (84, 76), "zold": (101, 67),
 }
 
 
@@ -82,11 +82,8 @@ LEE_ATTACK_FIGURES = (
     (Piece(0xAAC6, 2, 2),),
     (Piece(0xAB06, 2, 2),),
     (Piece(0xAB46, 2, 2),),
-    (Piece(0xAB86, 2, 2),),
-    (Piece(0xABC6, 2, 2),),
-    (Piece(0xAC06, 2, 2),),
-    (Piece(0xAC46, 2, 1),),
-    (Piece(0xAC66, 2, 1),),
+    (Piece(0xAB86, 1, 1),),
+    (Piece(0xAB96, 1, 1),),
 )
 LORA_ATTACK_FIGURES = (
     (Piece(0xAF06, 1, 2),),
@@ -104,10 +101,6 @@ ZOLD_ATTACK_FIGURES = (
     (Piece(0xB3A6, 2, 2),),
     (Piece(0xB3E6, 2, 1),),
     (Piece(0xB406, 1, 2),),
-    (Piece(0xB426, 2, 2),),
-    (Piece(0xB466, 2, 2),),
-    (Piece(0xB4A6, 2, 2),),
-    (Piece(0xB4E6, 2, 2),),
 )
 
 
@@ -151,9 +144,20 @@ ATTACK_FIGURES = {
         (119, 17, JUDE_ROD_UP),
         (119, 34, JUDE_ROD_LEFT),
     ),
-    "lee": _cell_layout(LEE_ATTACK_FIGURES, 51),
+    "lee": _cell_layout(LEE_ATTACK_FIGURES[:5], 51) + (
+        (85, 51, LEE_ATTACK_FIGURES[5]),
+        (102, 0, LEE_ATTACK_FIGURES[6]),
+        (102, 9, LEE_ATTACK_FIGURES[7]),
+        (85, 0, _row_major_tiles(0xABA6, 2, 1)),
+        (85, 9, _row_major_tiles(0xABC6, 2, 2)),
+        (85, 26, _row_major_tiles(0xAC06, 2, 3)),
+    ),
     "lora": _cell_layout(LORA_ATTACK_FIGURES, 51),
-    "zold": _cell_layout(ZOLD_ATTACK_FIGURES, 51),
+    "zold": tuple((x + 17, y, pieces) for x, y, pieces in _cell_layout(ZOLD_ATTACK_FIGURES[:3], 51)) + (
+        (0, 38, ZOLD_ATTACK_FIGURES[3]),
+        (4, 51, ZOLD_ATTACK_FIGURES[4]),
+        (68, 34, _row_major_tiles(0xB426, 4, 4)),
+    ),
 }
 # Figures written back by inject-art, in addition to the standard poses and portrait.
 EXTRA_FIGURES = {"hero": HERO_FIGURES, **ATTACK_FIGURES}
@@ -184,10 +188,16 @@ def _character_offsets(rom: bytes | bytearray, character: str) -> tuple[list[int
     return offsets, portrait
 
 
-def _sprite_position(index: int) -> tuple[int, int]:
+def _sprite_position(character: str, index: int) -> tuple[int, int]:
     if index < 9:
-        return (index % 3) * 17, (index // 3) * 17
+        return (index % 3 + (character == "zold")) * 17, (index // 3) * 17
+    if character == "zold":
+        return 0, (index - 9) * 17
     return 51 + (index - 9) * 17, 34
+
+
+def _portrait_x(character: str) -> int:
+    return 68 if character == "zold" else 51
 
 
 def render_character_art(rom: bytes, character: str) -> Image.Image:
@@ -195,16 +205,17 @@ def render_character_art(rom: bytes, character: str) -> Image.Image:
 
     image = Image.new("RGB", character_sheet_size(character), (255, 0, 0))
     draw = ImageDraw.Draw(image)
+    shift = 17 if character == "zold" else 0
     for x in (16, 33, 50):
-        draw.line((x, 0, x, 49), fill=(255, 0, 0))
-    draw.line((0, 16, 50, 16), fill=(255, 0, 0))
-    draw.line((0, 33, 83, 33), fill=(255, 0, 0))
-    draw.line((67, 34, 67, 49), fill=(255, 0, 0))
+        draw.line((x + shift, 0, x + shift, 49), fill=(255, 0, 0))
+    draw.line((shift, 16, 50 + shift, 16), fill=(255, 0, 0))
+    draw.line((shift, 33, 83 + shift, 33), fill=(255, 0, 0))
+    draw.line((67 + shift, 34, 67 + shift, 49), fill=(255, 0, 0))
 
     for index, offset in enumerate(offsets):
-        image.paste(render_sprite(rom, offset), _sprite_position(index))
+        image.paste(render_sprite(rom, offset), _sprite_position(character, index))
     portrait_image = render_portraits(rom[portrait:portrait + POW_PORTRAIT_BYTES], columns=1, scale=1)
-    image.paste(portrait_image, (51, 0))
+    image.paste(portrait_image, (_portrait_x(character), 0))
     for x, y, pieces in _band_figures(character):
         for piece in pieces:
             paste_piece(image, rom, piece, x, y)
@@ -231,10 +242,10 @@ def apply_character_art(rom: bytearray, character: str, image: Image.Image) -> N
             writes.append((offset + tile * TILE_BYTES, encode_tile(rows)))
 
     for index, offset in enumerate(offsets):
-        x, y = _sprite_position(index)
+        x, y = _sprite_position(character, index)
         apply_sprite_art(rom, gray, offset, x, y)
     portrait_positions = tuple((index % 4, index // 4) for index in range(16))
-    encode_tiles(portrait, 51, 0, portrait_positions, PORTRAIT_PALETTE)
+    encode_tiles(portrait, _portrait_x(character), 0, portrait_positions, PORTRAIT_PALETTE)
 
     for x, y, pieces in EXTRA_FIGURES.get(character, ()):
         for piece in pieces:

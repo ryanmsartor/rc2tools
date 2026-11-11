@@ -362,8 +362,9 @@ The sequence beginning at `0xA7C6` starts with Lee's nine standard movement and 
 | `0xAAC6-0xAB05` | Lee's fists facing down |
 | `0xAB06-0xAB45` | Lee's fists facing up |
 | `0xAB46-0xAB85` | Lee's fists facing left |
-| `0xAB86-0xABC5` | Two particle effects and the first two disjointed pieces of Lee's firecracker move |
-| `0xABC6-0xAC65` | Two and a half sprite-equivalents of additional firecracker effects; orientations are unclear in the current visualization |
+| `0xAB86-0xAB95` | One particle effect |
+| `0xAB96-0xABA5` | Another particle effect |
+| `0xABA6-0xAC65` | Firecracker effects arranged as 2×1, 2×2, and 2×3 tile groups; orientations remain uncertain |
 | `0xAC66-0xAC85` | Half-sprite of full transparency |
 | `0xAC86-0xACC5` | Lee defeated |
 
@@ -395,9 +396,9 @@ The sequence beginning at `0xACC6` starts with Lora's nine standard movement and
 
 The sequence occupies `0xACC6-0xB0E5` inclusive, a total of `0x420` bytes (16½ 64-byte sprite-equivalents). The next address is `0xB0E6` (CPU address `0x70E6` with bank 2 selected).
 
-### Zold animation, sword, and blade-wave sprites
+### Zold animation, sword, blade-wave, and Megaball sprites
 
-The sequence beginning at `0xB0E6` starts with Zold's nine standard movement and attack sprites in the same pose order as the other characters: two each idling down, up, and left, followed by one attack sprite facing down, up, and left. These are followed by Zold's sword, two half-sprites of blade waves, four unclear wave or bubble-effect sprites, and his defeated sprite.
+The sequence beginning at `0xB0E6` starts with Zold's nine standard movement and attack sprites in the same pose order as the other characters: two each idling down, up, and left, followed by one attack sprite facing down, up, and left. These are followed by Zold's sword, two half-sprites of blade waves, his Megaball ability, and his defeated sprite.
 
 | Physical ROM range | Contents |
 |---|---|
@@ -412,7 +413,7 @@ The sequence beginning at `0xB0E6` starts with Zold's nine standard movement and
 | `0xB3A6-0xB3E5` | Zold's sword facing left |
 | `0xB3E6-0xB405` | Half-sprite of Zold's downward blade wave, appearing split in two |
 | `0xB406-0xB425` | Half-sprite of Zold's left-facing blade wave |
-| `0xB426-0xB525` | Four sprites that may form a wave or bubble effect; not identified with certainty |
+| `0xB426-0xB525` | Zold's Megaball ability (16 tiles, arranged row-major in a 4×4 grid) |
 | `0xB526-0xB565` | Zold defeated |
 
 The sequence occupies `0xB0E6-0xB565` inclusive (`0x480` bytes, or 18 sprite-equivalents). The next address is `0xB566` (CPU address `0x7566` with bank 2 selected).

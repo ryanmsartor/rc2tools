@@ -253,7 +253,7 @@ or `--help`, to see its commands.
 ```sh
 ./rc2h reset                           # delete the in-progress copy and replace it with a fresh copy of input/
 ./rc2h clear                           # delete the in-progress copy
-./rc2h finalize [tag]                  # copy the in-progress copy to output/ and write an IPS patch.
+./rc2h finalize [tag]                  # copy the hack, IPS patch, and hack log to output/
 ./rc2h swap-char-sprite hero pit       # edit the in-progress copy in place
 ./rc2h dump-art <name>                 # export named art to working/<name>-art.png
 ./rc2h inject-art <name>               # apply working/<name>-art.png to the in-progress copy
@@ -275,7 +275,7 @@ Both `dump-art` and `inject-art` accept the same names:
 The `all` targets process the title first, then the characters, NPC art,
 ability icons, and font.
 They use the same files and behavior as each individual command: dumping overwrites
-existing PNGs, and injection records each applied image in `hacks.txt`.
+existing PNGs, and injection records each image that changes ROM bytes in `hacks.txt`.
 Processing stops on the first error; earlier dumps or injections remain in
 place.
 
@@ -317,10 +317,7 @@ defeat sprite, level-up face, and POW-screen portrait of the two characters.
 
 `dump-art <character>` exports one character's sprites, including its poses, POW
 portrait, defeat sprite, level-up face, and attack and particle sprites. `inject-art
-<character>` writes them back. The hero's sheet also includes its sword and
-electric-ball sprites. Lora's sheet omits the transparent tiles beside her
-shadow and healing particle; injection leaves those ROM bytes unchanged. Older
-Lora sheets use a different layout and must be re-created before injection.
+<character>` writes them back.
 
 `dump-art abilities` exports the in-UI weapon and ability icons. `inject-art
 abilities` writes them back.
@@ -335,15 +332,16 @@ than one place disagree.
 
 Each applied hack is recorded in `working/hacks.txt`, one line per hack. `reset`
 and `clear` delete this file, and `swap-char-sprite`, `inject-art`, `inject-font`,
-and `inject-stats` append to it.
-`finalize` does not copy it to `output/`.
+and `inject-stats` append to it. Injection commands log only changes to ROM bytes.
 
 `finalize` writes `output/Rolan's Curse II (USA) (hack finalized).gb` and
-`output/Rolan's Curse II (USA) (hack finalized).ips`. The patch is a diff from
+`output/Rolan's Curse II (USA) (hack finalized).ips`, and a copy of the log at
+`output/hack finalized.txt`. The patch is a diff from
 the original `input/` ROM to the finalized ROM, and it replaces any previous
 finalized files. The `working/` directory is ignored by git.
-An optional tag replaces `hack finalized` in both output filenames. For
+An optional tag replaces `hack finalized` in all three output filenames. For
 example, `./rc2h finalize "my hack"` writes
-`output/Rolan's Curse II (USA) (my hack).gb` and the matching `.ips` file.
+`output/Rolan's Curse II (USA) (my hack).gb`, the matching `.ips` file, and
+`output/my hack.txt`.
 Quote tags containing spaces. Tags must be nonempty and cannot contain path
 separators or control characters; existing files with the same tag are replaced.

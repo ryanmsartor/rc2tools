@@ -49,9 +49,12 @@ class CharacterArtTests(unittest.TestCase):
 
     def assert_character_art(self, image, character):
         self.assertEqual(image.size, character_sheet_size(character))
+        shift = 17 if character == "zold" else 0
         for cell, index in enumerate((0, 1, 6, 4, 5, 8, 2, 3, 7, 9, 10)):
             if cell < 9:
-                x, y = (cell % 3) * 17, (cell // 3) * 17
+                x, y = shift + (cell % 3) * 17, (cell // 3) * 17
+            elif character == "zold":
+                x, y = 0, (cell - 9) * 17
             else:
                 x, y = 51 + (cell - 9) * 17, 34
             colors = (index % 4, index // 4, (index + 1) % 4, (index + 2) % 4)
@@ -59,16 +62,17 @@ class CharacterArtTests(unittest.TestCase):
                 self.assertEqual(image.getpixel((x + dx, y + dy)), HACK_ART_PALETTE[colors[tile]])
         for tile in range(16):
             self.assertEqual(
-                image.getpixel((51 + (tile % 4) * 8, (tile // 4) * 8)),
+                image.getpixel((shift + 51 + (tile % 4) * 8, (tile // 4) * 8)),
                 PORTRAIT_PALETTE[tile % 4],
             )
         for x in (16, 33, 50):
-            self.assertTrue(all(image.getpixel((x, y)) == (255, 0, 0) for y in range(50)))
-        self.assertTrue(all(image.getpixel((x, 16)) == (255, 0, 0) for x in range(51)))
-        self.assertTrue(all(image.getpixel((x, 33)) == (255, 0, 0) for x in range(84)))
-        self.assertTrue(all(image.getpixel((67, y)) == (255, 0, 0) for y in range(34, 50)))
-        self.assertTrue(all(image.getpixel((x, 32)) == (255, 0, 0) for x in range(51, 84)))
-        self.assertTrue(all(image.getpixel((83, y)) == (255, 0, 0) for y in range(33)))
+            self.assertTrue(all(image.getpixel((x + shift, y)) == (255, 0, 0) for y in range(50)))
+        self.assertTrue(all(image.getpixel((x + shift, 16)) == (255, 0, 0) for x in range(51)))
+        self.assertTrue(all(image.getpixel((x + shift, 33)) == (255, 0, 0) for x in range(84)))
+        if character != "zold":
+            self.assertTrue(all(image.getpixel((67, y)) == (255, 0, 0) for y in range(34, 50)))
+        self.assertTrue(all(image.getpixel((x + shift, 32)) == (255, 0, 0) for x in range(51, 84)))
+        self.assertTrue(all(image.getpixel((83 + shift, y)) == (255, 0, 0) for y in range(33)))
 
     def test_short_rom_is_rejected(self):
         for character in CHARACTER_SPRITES:
@@ -130,6 +134,35 @@ class CharacterArtTests(unittest.TestCase):
                 apply_character_art(rom, character, render_character_art(original, character))
                 self.assertEqual(rom, original)
 
+    def test_lee_particles_and_row_major_effects_render_and_inject(self):
+        original = bytearray(random.Random(103).randbytes(0x20000))
+        for offset in range(0xAA06, 0xAC86, TILE_BYTES):
+            original[offset:offset + TILE_BYTES] = id_tile(offset)
+        image = render_character_art(original, "lee")
+        self.assertEqual(image.size, (110, 67))
+        expected = bytearray(original)
+        positions = [(0xAB86, 102, 0), (0xAB96, 102, 9)]
+        for figure in range(6):
+            for tile in range(4):
+                positions.append((0xAA06 + figure * 64 + tile * TILE_BYTES,
+                                  figure * 17 + tile // 2 * 8, 51 + tile % 2 * 8))
+        for start, y, tile_count in ((0xABA6, 0, 2), (0xABC6, 9, 4), (0xAC06, 26, 6)):
+            for tile in range(tile_count):
+                positions.append((start + tile * TILE_BYTES, 85 + tile % 2 * 8, y + tile // 2 * 8))
+        for index, (offset, x, y) in enumerate(positions):
+            with self.subTest(offset=hex(offset)):
+                self.assertEqual(read_tile_id(image, x, y), offset)
+                color = index % 4
+                image.paste(HACK_ART_PALETTE[color], (x, y, x + 8, y + 8))
+                expected[offset:offset + TILE_BYTES] = solid_tile(color)
+        for point in ((16, 51), (84, 51), (101, 0), (102, 8), (85, 8), (85, 25)):
+            self.assertEqual(image.getpixel(point), (255, 0, 0))
+            image.putpixel(point, (0, 0, 0))
+        rom = bytearray(original)
+        apply_character_art(rom, "lee", image)
+        self.assertEqual(rom, expected)
+        self.assertEqual(rom[0xAC66:0xAC86], original[0xAC66:0xAC86])
+
     def test_lora_attack_layout_and_injection(self):
         figures = (
             (0xAF06, 1, 2, 4, 51),
@@ -168,6 +201,42 @@ class CharacterArtTests(unittest.TestCase):
         self.assertEqual(rom[0xB066:0xB086], original[0xB066:0xB086])
         self.assertEqual(rom[0xB096:0xB0A6], original[0xB096:0xB0A6])
 
+    def test_zold_megaball_and_relocated_figures_render_and_inject(self):
+        original = bytearray(random.Random(102).randbytes(0x20000))
+        figures = (
+            (0xB326, 17, 51), (0xB366, 34, 51), (0xB3A6, 51, 51),
+            (0xB3E6, 0, 38), (0xB406, 4, 51),
+            (CHARACTER_SPRITES["zold"][1], 0, 0), (CHARACTER_SPRITES["zold"][2], 0, 17),
+        )
+        for offset, _, _ in figures:
+            original[offset:offset + TILE_BYTES] = id_tile(offset)
+        for index in range(16):
+            offset = 0xB426 + index * TILE_BYTES
+            original[offset:offset + TILE_BYTES] = id_tile(index + 1)
+
+        image = render_character_art(original, "zold")
+        self.assertEqual(image.size, (101, 67))
+        for offset, x, y in figures:
+            self.assertEqual(read_tile_id(image, x, y), offset)
+        expected = bytearray(original)
+        for offset, x, y in figures:
+            image.paste(HACK_ART_PALETTE[3], (x, y, x + 8, y + 8))
+            expected[offset:offset + TILE_BYTES] = solid_tile(3)
+        for index in range(16):
+            x, y = 68 + (index % 4) * 8, 34 + (index // 4) * 8
+            offset = 0xB426 + index * TILE_BYTES
+            with self.subTest(tile=index + 1):
+                self.assertEqual(read_tile_id(image, x, y), index + 1)
+                color = index % 4
+                image.paste(HACK_ART_PALETTE[color], (x, y, x + 8, y + 8))
+                expected[offset:offset + TILE_BYTES] = solid_tile(color)
+
+        self.assertEqual(image.getpixel((67, 34)), (255, 0, 0))
+        image.putpixel((67, 34), (0, 0, 0))
+        rom = bytearray(original)
+        apply_character_art(rom, "zold", image)
+        self.assertEqual(rom, expected)
+
     def test_inject_maps_every_tile_and_ignores_separators(self):
         original = random.Random(41).randbytes(0x20000)
         for character, (standard, defeated, face, portrait) in CHARACTER_SPRITES.items():
@@ -177,9 +246,14 @@ class CharacterArtTests(unittest.TestCase):
                 image = render_character_art(original, character)
                 offsets = [standard + index * SPRITE_BYTES for index in (0, 1, 6, 4, 5, 8, 2, 3, 7)]
                 offsets += [defeated, face]
+                shift = 17 if character == "zold" else 0
                 for cell, offset in enumerate(offsets):
-                    x = (cell % 3) * 17 if cell < 9 else 51 + (cell - 9) * 17
-                    y = (cell // 3) * 17 if cell < 9 else 34
+                    if cell < 9:
+                        x, y = shift + (cell % 3) * 17, (cell // 3) * 17
+                    elif character == "zold":
+                        x, y = 0, (cell - 9) * 17
+                    else:
+                        x, y = 51 + (cell - 9) * 17, 34
                     for tile, (dx, dy) in enumerate(((0, 0), (0, 8), (8, 0), (8, 8))):
                         tile_offset = offset + tile * 16
                         color = (HACK_ART_PALETTE.index(image.getpixel((x + dx, y + dy))) + 1) % 4
@@ -187,13 +261,16 @@ class CharacterArtTests(unittest.TestCase):
                         expected[tile_offset] = (expected[tile_offset] & 0x7F) | ((color & 1) << 7)
                         expected[tile_offset + 1] = (expected[tile_offset + 1] & 0x7F) | ((color >> 1) << 7)
                 for tile in range(16):
-                    x, y = 51 + tile % 4 * 8, tile // 4 * 8
+                    x, y = shift + 51 + tile % 4 * 8, tile // 4 * 8
                     tile_offset = portrait + tile * 16
                     color = (PORTRAIT_PALETTE.index(image.getpixel((x, y))) + 1) % 4
                     image.putpixel((x, y), PORTRAIT_PALETTE[color])
                     expected[tile_offset] = (expected[tile_offset] & 0x7F) | ((color & 1) << 7)
                     expected[tile_offset + 1] = (expected[tile_offset + 1] & 0x7F) | ((color >> 1) << 7)
-                for point in ((16, 0), (51, 32), (83, 0), (67, 34)):
+                points = [(16 + shift, 0), (51 + shift, 32), (83 + shift, 0)]
+                if character != "zold":
+                    points.append((67, 34))
+                for point in points:
                     image.putpixel(point, (0, 255, 0))
                 apply_character_art(rom, character, image)
                 self.assertEqual(rom, expected)
@@ -226,7 +303,9 @@ class CharacterArtTests(unittest.TestCase):
 ATTACK_START = 0x95C6
 ATTACK_END = 0xB566
 # Transparent tiles omitted by dump and injection.
-DROPPED_TRANSPARENT_RANGES = ((0xA1E6, 0xA206), (0xB066, 0xB086), (0xB096, 0xB0A6))
+DROPPED_TRANSPARENT_RANGES = (
+    (0xA1E6, 0xA206), (0xAC66, 0xAC86), (0xB066, 0xB086), (0xB096, 0xB0A6),
+)
 
 
 def _attack_pieces():

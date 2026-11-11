@@ -142,14 +142,20 @@ def dump_art(name: str) -> None:
     print(f"Wrote {path}")
 
 
-def read_art(name: str) -> None:
+def read_art(name: str) -> bool:
     _, apply = ART_HANDLERS[name]
-    rom = bytearray(WORKING_ROM_PATH.read_bytes())
+    original = WORKING_ROM_PATH.read_bytes()
+    rom = bytearray(original)
     path = art_png_path(name)
     with Image.open(path) as image:
         apply(rom, image)
-    WORKING_ROM_PATH.write_bytes(rom)
-    print(f"Applied {path} to {WORKING_ROM_PATH}")
+    changed = rom != original
+    if changed:
+        WORKING_ROM_PATH.write_bytes(rom)
+        print(f"Applied {path} to {WORKING_ROM_PATH}")
+    else:
+        print(f"No ROM changes from {path}")
+    return changed
 
 
 def finalize_working_copy(tag: str) -> None:
@@ -161,10 +167,13 @@ def finalize_working_copy(tag: str) -> None:
     stem = f"{Path(ROM_NAME).stem} ({tag})"
     rom_output = OUTPUT_DIR / f"{stem}.gb"
     patch_output = OUTPUT_DIR / f"{stem}.ips"
+    log_output = OUTPUT_DIR / f"{tag}.txt"
     rom_output.write_bytes(modified)
     patch_output.write_bytes(patch)
+    shutil.copyfile(HACKS_LOG_PATH, log_output)
     print(f"Wrote {rom_output}")
     print(f"Wrote {patch_output}")
+    print(f"Wrote {log_output}")
 
 
 def _add_swap_arguments(parser: argparse.ArgumentParser) -> None:
@@ -228,7 +237,7 @@ def main() -> int:
     subparsers.add_parser("reset", help="replace the in-progress hack copy with a fresh copy of the input ROM")
     finalize_parser = subparsers.add_parser(
         "finalize",
-        help="copy the in-progress hack into output/ with an IPS patch and optional filename tag",
+        help="copy the in-progress hack, IPS patch, and hack log into output/",
     )
     finalize_parser.add_argument(
         "tag", nargs="?", default=DEFAULT_FINALIZE_TAG, type=_finalize_tag,
@@ -292,13 +301,13 @@ def main() -> int:
                 dump_art(name)
         elif args.subcommand == "inject-art":
             for name in ART_NAMES if args.name == "all" else (args.name,):
-                read_art(name)
-                record_hack(f"inject-art {name}")
+                if read_art(name):
+                    record_hack(f"inject-art {name}")
         elif args.subcommand == "dump-font":
             dump_art("font")
         elif args.subcommand == "inject-font":
-            read_art("font")
-            record_hack("inject-font")
+            if read_art("font"):
+                record_hack("inject-font")
         elif args.subcommand == "dump-stats":
             dump_stats(args.source)
         elif args.subcommand == "inject-stats":

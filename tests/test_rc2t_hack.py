@@ -77,6 +77,7 @@ class HackWrapperTests(unittest.TestCase):
         result = self.run_wrapper("finalize")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(self.working.read_bytes(), self.rom)
+        self.assertEqual((self.root / "output" / "hack finalized.txt").read_bytes(), b"")
 
     def test_clear_deletes_working_copy(self):
         self.run_wrapper("reset")
@@ -115,6 +116,10 @@ class HackWrapperTests(unittest.TestCase):
 
     def test_finalize_custom_tag_via_rc2h(self):
         self.run_wrapper("reset")
+        log_content = b"first hack\nsecond hack\n"
+        self.hacks_log.write_bytes(log_content)
+        log_output = self.root / "output" / "my hack.txt"
+        log_output.write_bytes(b"old content\n")
         edited = bytearray(self.rom)
         edited[0x150:0x153] = b"\xAA\xBB\xCC"
         self.working.write_bytes(edited)
@@ -129,9 +134,11 @@ class HackWrapperTests(unittest.TestCase):
         self.assertEqual((self.root / "output" / f"{stem}.gb").read_bytes(), edited)
         patch = (self.root / "output" / f"{stem}.ips").read_bytes()
         self.assertEqual(patch, b"PATCH\x00\x01\x50\x00\x03\xAA\xBB\xCCEOF")
+        self.assertEqual(log_output.read_bytes(), log_content)
+        self.assertIn(str(log_output), result.stdout)
         self.assertFalse((self.root / "output" / f"{FINALIZED_STEM}.gb").exists())
         self.assertEqual(self.working.read_bytes(), edited)
-        self.assertEqual(self.hacks_log.read_text(), "")
+        self.assertEqual(self.hacks_log.read_bytes(), log_content)
 
     def test_finalize_rejects_invalid_tags_before_creating_working_copy(self):
         for tag in ("", "  ", "../outside", "a\\b", "bad\nname"):
@@ -251,7 +258,7 @@ class HackWrapperTests(unittest.TestCase):
         self.assertEqual(self.working.read_bytes(), before)
         self.assertEqual(self.hacks_log.read_text(), "")
 
-    def test_finalize_after_swap_outputs_only_rom_and_patch(self):
+    def test_finalize_after_swap_outputs_rom_patch_and_log(self):
         rom = self.build_sprite_rom()
         self.use_input_rom(rom)
         self.run_wrapper("reset")
@@ -260,12 +267,16 @@ class HackWrapperTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         output_rom = self.root / "output" / f"{FINALIZED_STEM}.gb"
         patch = self.root / "output" / f"{FINALIZED_STEM}.ips"
+        log = self.root / "output" / "hack finalized.txt"
         self.assertEqual(output_rom.read_bytes(), self.expected_swapped(rom))
         self.assertTrue(patch.read_bytes().startswith(b"PATCH"))
         self.assertTrue(patch.read_bytes().endswith(b"EOF"))
+        self.assertEqual(log.read_bytes(), self.hacks_log.read_bytes())
+        self.assertEqual(log.read_text(), "swap-char-sprite hero pit\n")
+        self.assertIn(str(log), result.stdout)
         self.assertEqual(
             sorted(path.name for path in (self.root / "output").iterdir()),
-            sorted([output_rom.name, patch.name]),
+            sorted([output_rom.name, patch.name, log.name]),
         )
 
     def test_missing_subcommand_fails(self):
@@ -363,11 +374,12 @@ class HackWrapperTests(unittest.TestCase):
                 with Image.open(self.root / "working" / f"{character}-art.png") as image:
                     expected = {
                         "hero": (118, 67), "pit": (84, 84), "lane": (84, 67), "kyle": (84, 93),
-                        "jude": (135, 50), "lee": (84, 93), "lora": (84, 76), "zold": (84, 84),
+                        "jude": (135, 50), "lee": (110, 67), "lora": (84, 76), "zold": (101, 67),
                     }
                     self.assertEqual(image.size, expected.get(character, (84, 50)))
                     shade = (170, 0, 85, 255)[index % 4]
-                    self.assertEqual(image.getpixel((0, 0)), (shade, shade, shade))
+                    x = 17 if character == "zold" else 0
+                    self.assertEqual(image.getpixel((x, 0)), (shade, shade, shade))
         self.assertEqual(self.working.read_bytes(), bytes(rom))
         self.assertEqual(self.hacks_log.read_text(), "")
 
@@ -485,12 +497,17 @@ class HackWrapperTests(unittest.TestCase):
             sizes = {
                 "title": (160, 88), "npc": (203, 169), "hero": (118, 67),
                 "pit": (84, 84), "lane": (84, 67), "kyle": (84, 93),
-                "jude": (135, 50), "lee": (84, 93), "lora": (84, 76), "zold": (84, 84),
+                "jude": (135, 50), "lee": (110, 67), "lora": (84, 76), "zold": (101, 67),
                 "abilities": (101, 67), "font": (53, 71),
             }
             self.assertEqual(edited.size, sizes.get(name, (84, 50)))
-            if name == "title":
+            if name == "zold":
+                point = (17, 0)
+                edited.putpixel(point, (85, 85, 85) if edited.getpixel(point) != (85, 85, 85) else (255, 255, 255))
+            elif name == "title":
                 edited.putpixel((0, 0), 0 if edited.getpixel((0, 0)) != 0 else 255)
+            elif name == "font":
+                edited.putpixel((0, 0), (0, 0, 0) if edited.getpixel((0, 0)) != (0, 0, 0) else (255, 255, 255))
             else:
                 edited.putpixel((0, 0), (85, 85, 85) if edited.getpixel((0, 0)) != (85, 85, 85) else (255, 255, 255))
             edited.save(path)
@@ -512,15 +529,40 @@ class HackWrapperTests(unittest.TestCase):
         self.assertEqual(self.working.read_bytes(), combined)
         self.assertEqual(self.hacks_log.read_text(), expected_log)
 
+    def test_inject_all_logs_only_changed_targets(self):
+        rom = self.build_sprite_rom()
+        self.use_input_rom(rom)
+        self.assertEqual(self.run_wrapper("dump-art", "all").returncode, 0)
+        path = self.root / "working" / "hero-art.png"
+        with Image.open(path) as image:
+            edited = image.copy()
+        old = edited.getpixel((0, 0))
+        edited.putpixel((0, 0), (0, 0, 0) if old != (0, 0, 0) else (255, 255, 255))
+        edited.save(path)
+        result = self.run_wrapper("inject-art", "all")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        changed_rom = self.working.read_bytes()
+        self.assertNotEqual(changed_rom, rom)
+        self.assertEqual(self.hacks_log.read_text(), "inject-art title\ninject-art hero\n")
+        result = self.run_wrapper("inject-art", "all")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self.working.read_bytes(), changed_rom)
+        self.assertEqual(self.hacks_log.read_text(), "inject-art title\ninject-art hero\n")
+
 
     def test_inject_all_stops_at_missing_image_and_keeps_prior_results(self):
         self.use_input_rom(self.build_sprite_rom())
         self.assertEqual(self.run_wrapper("dump-art", "all").returncode, 0)
+        path = self.root / "working" / "hero-art.png"
+        with Image.open(path) as image:
+            edited = image.copy()
+        edited.putpixel((0, 0), (85, 85, 85))
+        edited.save(path)
         (self.root / "working" / "lane-art.png").unlink()
         result = self.run_wrapper("inject-art", "all")
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("lane-art.png", result.stderr)
-        self.assertEqual(self.hacks_log.read_text(), "inject-art title\ninject-art hero\ninject-art pit\n")
+        self.assertEqual(self.hacks_log.read_text(), "inject-art title\ninject-art hero\n")
 
     def test_inject_each_character_and_log(self):
         starts = {
@@ -536,7 +578,7 @@ class HackWrapperTests(unittest.TestCase):
                 png = self.root / "working" / f"{character}-art.png"
                 with Image.open(png) as image:
                     edited = image.copy()
-                edited.putpixel((0, 0), (85, 85, 85))
+                edited.putpixel((17 if character == "zold" else 0, 0), (85, 85, 85))
                 edited.save(png)
                 result = subprocess.run(
                     [str(self.root / "rc2h"), "inject-art", character],
@@ -599,7 +641,7 @@ class HackWrapperTests(unittest.TestCase):
         result = self.run_wrapper("inject-art", "npc")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(self.working.read_bytes(), rom)
-        self.assertEqual(self.hacks_log.read_text(), "inject-art npc\n")
+        self.assertEqual(self.hacks_log.read_text(), "")
 
     def test_npc_art_edit_changes_only_its_sprite_tile_bytes(self):
         # Sheet pixels (0, 0) and (136, 85) are the top-left corners of the first idle NPC
@@ -675,7 +717,20 @@ class HackWrapperTests(unittest.TestCase):
         dumped = (self.root / "working" / "font-art.png").read_bytes()
         self.assertEqual(self.run_wrapper("dump-font").returncode, 0)
         self.assertEqual((self.root / "working" / "font-art.png").read_bytes(), dumped)
+        png = self.root / "working" / "font-art.png"
+        with Image.open(png) as image:
+            edited = image.copy()
+        original_pixel = edited.getpixel((0, 0))
+        changed_pixel = (0, 0, 0) if original_pixel != (0, 0, 0) else (255, 255, 255)
+        edited.putpixel((0, 0), changed_pixel)
+        edited.save(png)
         self.assertEqual(self.run_wrapper("inject-art", "font").returncode, 0)
+        changed_rom = self.working.read_bytes()
+        self.assertNotEqual(changed_rom, self.rom)
+        self.assertEqual(self.run_wrapper("inject-font").returncode, 0)
+        self.assertEqual(self.hacks_log.read_text(), "inject-art font\n")
+        edited.putpixel((0, 0), original_pixel)
+        edited.save(png)
         self.assertEqual(self.run_wrapper("inject-font").returncode, 0)
         self.assertEqual(self.working.read_bytes(), self.rom)
         self.assertEqual(self.hacks_log.read_text(), "inject-art font\ninject-font\n")
@@ -686,7 +741,7 @@ class HackWrapperTests(unittest.TestCase):
         result = self.run_wrapper("inject-font")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(self.working.read_bytes(), self.rom)
-        self.assertEqual(self.hacks_log.read_text(), "inject-font\n")
+        self.assertEqual(self.hacks_log.read_text(), "")
 
     def test_font_edit_changes_only_its_glyph_byte(self):
         # Glyphs fill the sheet in ROM order: glyph 2t is the top of tile t and 2t+1 is its bottom.
@@ -718,6 +773,7 @@ class HackWrapperTests(unittest.TestCase):
         edited.save(png)
         self.assertEqual(self.run_wrapper("inject-font").returncode, 0)
         self.assertEqual(self.working.read_bytes(), before)
+        self.assertEqual(self.hacks_log.read_text(), "")
 
     def test_font_injection_wrong_size_does_not_change_rom_or_log(self):
         self.run_wrapper("reset")
