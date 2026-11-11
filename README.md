@@ -251,27 +251,27 @@ Run `./rc2h` without arguments, or with `h`, `help`, `-h`, `-help`, `--h`,
 or `--help`, to see its commands.
 
 ```sh
-./rc2t hack reset     # delete the in-progress copy and replace it with a fresh copy of input/
-./rc2t hack clear     # delete the in-progress copy
-./rc2t hack finalize  # copy the in-progress copy to output/ and write an IPS patch
-./rc2h finalize "my hack"  # use a custom parenthetical filename tag
-./rc2t hack swap-char-sprite hero pit  # edit the in-progress copy in place
-./rc2t hack dump-art title   # write working/title-art.png from the in-progress copy
-./rc2h dump-art hero         # write working/hero-art.png from the in-progress copy
-./rc2h inject-art hero       # apply working/hero-art.png to the in-progress copy
-./rc2t hack inject-art title   # apply an edited working/title-art.png to the in-progress copy
-./rc2h dump-art all          # export title, all eight characters, and NPC art
-./rc2h inject-art all        # apply every art PNG
-./rc2h dump-art npc          # export documented town NPC and non-boss enemy graphics
-./rc2h inject-art npc        # apply working/npc-art.png to the in-progress copy
-./rc2t hack dump-font        # write working/font-art.png from the in-progress copy
-./rc2t hack inject-font      # apply working/font-art.png to the in-progress copy
-./rc2h dump-art font         # same as dump-font
-./rc2h inject-art font       # same as inject-font
+./rc2h reset                           # delete the in-progress copy and replace it with a fresh copy of input/
+./rc2h clear                           # delete the in-progress copy
+./rc2h finalize [tag]                  # copy the in-progress copy to output/ and write an IPS patch.
+./rc2h swap-char-sprite hero pit       # edit the in-progress copy in place
+./rc2h dump-art <name>                 # export named art to working/<name>-art.png
+./rc2h inject-art <name>               # apply working/<name>-art.png to the in-progress copy
+./rc2h dump-font                       # synonym for dump-art font
+./rc2h inject-font                     # synonym for inject-art font
 ```
 
-The `all` targets process the title first, then the characters, then NPC art,
-then the font.
+Both `dump-art` and `inject-art` accept the same names:
+
+- `title`
+- `hero`, `pit`, `lane`, `kyle`, `jude`, `lee`, `lora`, or `zold`
+- `npc`
+- `abilities`
+- `font`
+- `all`
+
+The `all` targets process the title first, then the characters, NPC art,
+ability icons, and font.
 They use the same files and behavior as each individual command: dumping overwrites
 existing PNGs, and injection records each applied image in `hacks.txt`.
 Processing stops on the first error; earlier dumps or injections remain in
@@ -320,6 +320,13 @@ mapped to the nearest of the four hack-art shades (index 0 is light gray and
 transparent in-game for sprites, 1 is black, 2 is dark gray, and 3 is white). POW
 portraits keep their original palette. Red separators and padding are ignored, and
 image transparency is not used.
+
+`dump-art abilities` writes the 23 in-UI weapon and ability icons from
+`0x804E-0x860D` to `working/abilities-art.png` in ROM order. The 16×16 sprites
+are shown at native size with the NPC sprite palette, six per row, separated by
+one-pixel red gutters; unused sheet space is also red. `inject-art abilities`
+reads the same 101×67 sheet, maps pixels to the nearest NPC sprite palette
+shade, ignores the red gutters, and rewrites only the 23 icon sprites.
 
 `dump-art title` writes the title screen's logo above the START/CONTINUE line to
 `working/title-art.png`. The image is 160×88 pixels: the art's 11 rows of

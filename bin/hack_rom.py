@@ -8,6 +8,7 @@ from pathlib import Path
 
 from PIL import Image
 
+from ability_art import apply_ability_art, render_ability_art
 from art_layout import ART_LAYOUTS, apply_art, render_art
 from character_art import apply_character_art, render_character_art
 from font_art import apply_font_art, render_font_art
@@ -25,7 +26,7 @@ OUTPUT_DIR = ROOT / "output"
 DEFAULT_FINALIZE_TAG = "hack finalized"
 SWAP_SUBCOMMAND = "swap-char-sprite"
 SWAP_ALIAS = "swap-character-sprite"
-ART_NAMES = (*ART_LAYOUTS, *CHARACTER_SPRITES, "npc", "font")
+ART_NAMES = (*ART_LAYOUTS, *CHARACTER_SPRITES, "npc", "abilities", "font")
 IPS_HEADER = b"PATCH"
 IPS_EOF = b"EOF"
 IPS_EOF_OFFSET = int.from_bytes(IPS_EOF, "big")
@@ -109,7 +110,9 @@ def art_png_path(name: str) -> Path:
 
 def dump_art(name: str) -> None:
     rom = WORKING_ROM_PATH.read_bytes()
-    if name == "npc":
+    if name == "abilities":
+        image = render_ability_art(rom)
+    elif name == "npc":
         image = render_npc_art(rom)
     elif name == "font":
         image = render_font_art(rom)
@@ -128,6 +131,8 @@ def read_art(name: str) -> None:
     with Image.open(path) as image:
         if name == "npc":
             apply_npc_art(rom, image)
+        elif name == "abilities":
+            apply_ability_art(rom, image)
         elif name == "font":
             apply_font_art(rom, image)
         elif name in CHARACTER_SPRITES:
@@ -168,9 +173,9 @@ def _add_swap_arguments(parser: argparse.ArgumentParser) -> None:
     )
 
 
-def _add_art_arguments(parser: argparse.ArgumentParser) -> None:
+def _add_art_arguments(parser: argparse.ArgumentParser, names=ART_NAMES) -> None:
     parser.add_argument(
-        "name", choices=(*ART_NAMES, "all"),
+        "name", choices=(*names, "all"),
         help="named art to use, or all supported art",
     )
 

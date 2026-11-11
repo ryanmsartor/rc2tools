@@ -221,10 +221,10 @@ DEFAULT_PALETTE = (
     (255, 255, 255),
 )
 PORTRAIT_PALETTE = (
-    (168, 168, 168),
+    (170, 170, 170),
     (0, 0, 0),
-    (96, 96, 96),
-    (248, 248, 248),
+    (85, 85, 85),
+    (255, 255, 255),
 )
 # Used by the hack dump-art and inject-art commands for NPC and character sprites; index 0 is transparent.
 HACK_ART_PALETTE = (

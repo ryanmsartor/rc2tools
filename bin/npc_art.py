@@ -2,21 +2,16 @@
 
 from PIL import Image
 
-from art_layout import _encode_tile
-from render_graphics import (
-    HACK_ART_PALETTE,
-    SPRITE_TILE_POSITIONS,
-    TILE_BYTES,
-    TILE_WIDTH,
-    render_sprites,
+from sprite_art import (
+    PITCH,
+    SEPARATOR,
+    SPRITE_BYTES,
+    apply_sprite_art,
+    render_sprite_sheet,
 )
 
 
-SPRITE_BYTES = 64
-SPRITE_SIZE = 16
-SEPARATOR = (255, 0, 0)
 COLUMNS = 12
-PITCH = SPRITE_SIZE + 1
 
 # Idle NPC frames that are byte-identical to enemy frames. Only the enemy copy is dumped;
 # injection writes the edited bytes to the idle copy as well.
@@ -74,11 +69,7 @@ def _sheet(rom_length: int) -> tuple[list[tuple[int, int, int]], tuple[int, int]
 def render_npc_art(rom: bytes) -> Image.Image:
     """Render every documented NPC and non-boss enemy frame at 1:1 scale with a red grid."""
     placements, size = _sheet(len(rom))
-    image = Image.new("RGB", size, SEPARATOR)
-    for offset, column, row in placements:
-        sprite = render_sprites(rom[offset:offset + SPRITE_BYTES], columns=1, scale=1, palette=HACK_ART_PALETTE)
-        image.paste(sprite, (column * PITCH, row * PITCH))
-    return image
+    return render_sprite_sheet(rom, placements, size)
 
 
 def apply_npc_art(rom: bytearray, image: Image.Image) -> None:
@@ -88,19 +79,10 @@ def apply_npc_art(rom: bytearray, image: Image.Image) -> None:
         width, height = size
         raise ValueError(f"expected a {width}x{height} image, got {image.width}x{image.height}")
     gray = image.convert("L")
-    shades = [color[0] for color in HACK_ART_PALETTE]
-    lut = [min(range(len(shades)), key=lambda index: abs(shades[index] - level)) for level in range(256)]
 
     for offset, column, row in placements:
         x, y = column * PITCH, row * PITCH
-        for tile, (tile_col, tile_row) in enumerate(SPRITE_TILE_POSITIONS):
-            pixels = [
-                [lut[gray.getpixel((x + tile_col * TILE_WIDTH + px, y + tile_row * TILE_WIDTH + py))]
-                 for px in range(TILE_WIDTH)]
-                for py in range(TILE_WIDTH)
-            ]
-            start = offset + tile * TILE_BYTES
-            rom[start:start + TILE_BYTES] = _encode_tile(pixels)
+        apply_sprite_art(rom, gray, offset, x, y)
 
     for duplicate, original in DUPLICATE_FRAMES.items():
         rom[duplicate:duplicate + SPRITE_BYTES] = rom[original:original + SPRITE_BYTES]
