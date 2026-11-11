@@ -341,7 +341,7 @@ class HackWrapperTests(unittest.TestCase):
         )
         self.assertEqual(result.returncode, 0, result.stderr)
         with Image.open(self.root / "working" / "hero-art.png") as image:
-            self.assertEqual(image.size, (84, 50))
+            self.assertEqual(image.size, (118, 67))
             self.assertEqual(image.getpixel((16, 0)), (255, 0, 0))
         self.assertEqual(self.working.read_bytes(), before)
         self.assertEqual(self.hacks_log.read_text(), "")
@@ -367,10 +367,34 @@ class HackWrapperTests(unittest.TestCase):
                 )
                 self.assertEqual(result.returncode, 0, result.stderr)
                 with Image.open(self.root / "working" / f"{character}-art.png") as image:
-                    self.assertEqual(image.size, (84, 50))
+                    expected = {
+                        "hero": (118, 67), "pit": (84, 84), "lane": (84, 67), "kyle": (84, 93),
+                        "jude": (135, 50), "lee": (84, 93), "lora": (84, 84), "zold": (84, 84),
+                    }
+                    self.assertEqual(image.size, expected.get(character, (84, 50)))
                     shade = (170, 0, 85, 255)[index % 4]
                     self.assertEqual(image.getpixel((0, 0)), (shade, shade, shade))
         self.assertEqual(self.working.read_bytes(), bytes(rom))
+        self.assertEqual(self.hacks_log.read_text(), "")
+
+    def test_weapons_is_not_an_art_name(self):
+        self.assertEqual(self.run_wrapper("reset").returncode, 0)
+        before = self.working.read_bytes()
+
+        result = subprocess.run(
+            [str(self.root / "rc2h"), "dump-art", "weapons"],
+            cwd=self.root / "input",
+            capture_output=True,
+            text=True,
+        )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("invalid choice", result.stderr)
+
+        result = self.run_wrapper("inject-art", "weapons")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("invalid choice", result.stderr)
+        self.assertFalse((self.root / "working" / "weapons-art.png").exists())
+        self.assertEqual(self.working.read_bytes(), before)
         self.assertEqual(self.hacks_log.read_text(), "")
 
     def test_dump_ability_art_in_rom_order(self):
@@ -465,7 +489,9 @@ class HackWrapperTests(unittest.TestCase):
             with Image.open(path) as image:
                 edited = image.copy()
             sizes = {
-                "title": (160, 88), "npc": (203, 169),
+                "title": (160, 88), "npc": (203, 169), "hero": (118, 67),
+                "pit": (84, 84), "lane": (84, 67), "kyle": (84, 93),
+                "jude": (135, 50), "lee": (84, 93), "lora": (84, 84), "zold": (84, 84),
                 "abilities": (101, 67), "font": (53, 71),
             }
             self.assertEqual(edited.size, sizes.get(name, (84, 50)))
@@ -539,7 +565,7 @@ class HackWrapperTests(unittest.TestCase):
         Image.new("RGB", (1, 1)).save(self.root / "working" / "hero-art.png")
         result = self.run_wrapper("inject-art", "hero")
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("expected a 84x50 image", result.stderr)
+        self.assertIn("expected a 118x67 image", result.stderr)
         self.assertEqual(self.working.read_bytes(), before)
         self.assertEqual(self.hacks_log.read_text(), "")
 

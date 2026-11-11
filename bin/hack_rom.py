@@ -173,9 +173,9 @@ def _add_swap_arguments(parser: argparse.ArgumentParser) -> None:
     )
 
 
-def _add_art_arguments(parser: argparse.ArgumentParser, names=ART_NAMES) -> None:
+def _add_art_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
-        "name", choices=(*names, "all"),
+        "name", choices=(*ART_NAMES, "all"),
         help="named art to use, or all supported art",
     )
 

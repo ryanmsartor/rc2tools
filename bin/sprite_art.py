@@ -1,5 +1,7 @@
 """Shared rendering and pixel encoding for the 16x16 sprite sheets."""
 
+from typing import NamedTuple, Optional
+
 from PIL import Image
 
 from art_layout import _encode_tile
@@ -8,6 +10,7 @@ from render_graphics import (
     SPRITE_TILE_POSITIONS,
     TILE_BYTES,
     TILE_WIDTH,
+    decode_tiles,
     render_sprites,
 )
 
@@ -71,3 +74,65 @@ def apply_sprite_art(rom: bytearray, gray: Image.Image, offset: int, x: int, y: 
         ]
         start = offset + tile * TILE_BYTES
         rom[start:start + TILE_BYTES] = _encode_tile(rows)
+
+
+class Piece(NamedTuple):
+    """Tiles stored column-first, placed `left` tile columns and `top` tile rows into a figure.
+
+    An offset of None is an empty tile slot: it renders as red filler and is never injected.
+    """
+
+    offset: Optional[int]
+    columns: int
+    rows: int
+    top: int = 0
+    left: int = 0
+
+
+def _check_piece(rom_length: int, piece: Piece) -> None:
+    if piece.offset is None:
+        return
+    size = piece.columns * piece.rows * TILE_BYTES
+    if piece.offset < 0 or piece.offset + size > rom_length:
+        raise ValueError("ROM does not contain complete sprite data")
+
+
+def paste_piece(image: Image.Image, rom: bytes, piece: Piece, x: int, y: int) -> None:
+    """Draw one piece with its top-left corner at (x, y) plus its tile offset within the figure."""
+    left = x + piece.left * TILE_WIDTH
+    top = y + piece.top * TILE_WIDTH
+    if piece.offset is None:
+        image.paste(SEPARATOR, (left, top, left + piece.columns * TILE_WIDTH, top + piece.rows * TILE_WIDTH))
+        return
+    _check_piece(len(rom), piece)
+    size = piece.columns * piece.rows * TILE_BYTES
+    tiles = decode_tiles(rom[piece.offset:piece.offset + size])
+    for index, tile in enumerate(tiles):
+        tile_column, tile_row = divmod(index, piece.rows)
+        for py, row in enumerate(tile):
+            for px, shade in enumerate(row):
+                image.putpixel(
+                    (left + tile_column * TILE_WIDTH + px, top + tile_row * TILE_WIDTH + py),
+                    HACK_ART_PALETTE[shade],
+                )
+
+
+def apply_piece(rom: bytearray, gray: Image.Image, piece: Piece, x: int, y: int) -> None:
+    """Encode one piece from a grayscale sheet; empty slots are skipped so the ROM keeps its bytes."""
+    if piece.offset is None:
+        return
+    _check_piece(len(rom), piece)
+    left = x + piece.left * TILE_WIDTH
+    top = y + piece.top * TILE_WIDTH
+    for index in range(piece.columns * piece.rows):
+        tile_column, tile_row = divmod(index, piece.rows)
+        rows = [
+            [
+                PALETTE_LUT[gray.getpixel((left + tile_column * TILE_WIDTH + px, top + tile_row * TILE_WIDTH + py))]
+                for px in range(TILE_WIDTH)
+            ]
+            for py in range(TILE_WIDTH)
+        ]
+        start = piece.offset + index * TILE_BYTES
+        rom[start:start + TILE_BYTES] = _encode_tile(rows)
+

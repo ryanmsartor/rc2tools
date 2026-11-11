@@ -326,13 +326,43 @@ defeat sprite, level-up face, and POW-screen portrait of the two characters.
 three columns have rows for down, left, and up: two idle poses and an attack
 pose in each row. The 32×32 POW portrait is to their right, with the defeated
 sprite and level-up face below it. Red lines and padding separate the images.
-`inject-art <character>` reads the corresponding 84×50 PNG and replaces only
-that character's nine standard poses, defeated sprite, level-up face, and POW
-portrait in the in-progress ROM. Pixel colors are converted to grayscale and
+`inject-art <character>` reads the corresponding PNG and replaces only that
+character's nine standard poses, defeated sprite, level-up face, POW portrait, and
+every attack sheet below them in the in-progress ROM. Sheet sizes are hero
+118×67, pit 84×84, lane 84×67, kyle 84×93, jude 135×50, lee 84×93, lora 84×84, and
+zold 84×84. Pixel colors are converted to grayscale and
 mapped to the nearest of the four hack-art shades (index 0 is light gray and
 transparent in-game for sprites, 1 is black, 2 is dark gray, and 3 is white). POW
 portraits keep their original palette. Red separators and padding are ignored, and
 image transparency is not used.
+
+The hero sheet is 118×67 because it also holds the hero's sword, sword arcs, and
+electric-ball halves (`0x9346-0x95C5`). The three sword sprites sit below the poses,
+followed by the two electric-ball halves. All four sword arcs are clustered to the right
+of the portrait: the left-facing arcs (tiles 7-12 and 19-24) sit beside it, with the
+downward arc of tiles 1-6 below them and the downward arc of tiles 13-18 below that.
+Arc tiles are numbered 1-24 in ROM order (tile 1 is at `0x9406`, tile 24 at
+`0x9576`). Solid red cells are empty filler that is not ROM graphics, so
+`inject-art hero` ignores them and never writes to them.
+
+`dump-art pit`, `dump-art lane`, `dump-art kyle`, `dump-art lee`, `dump-art lora`, and
+`dump-art zold` add a grid of each character's attack and particle sprites below the
+poses, starting at y=51, with five sprites per row. `inject-art` writes every one of
+these sheets back. Pit has eight sprites (84×84), lane has four (84×67), kyle has eleven
+(84×93), Lee has eleven (84×93), Lora has ten (84×84), and Zold has nine (84×84). Each
+figure is centered in a 16-pixel-wide cell, with a 1-pixel red separator between cells,
+and each row is as tall as its tallest figure. Half-sprites (8×16 or 16×8) are placed so
+that multi-tile pieces form a complete image.
+`dump-art jude` instead places its eight attack figures individually on a 135×50 sheet,
+and `inject-art jude` writes them back. The earthquake pose (16×32) and the two smash balls
+sit right of the POW portrait, the small leftward fireball sits under the tall smash ball,
+the small downward fireball sits right of the leftward smash ball, and the three rods are
+stacked in a column at the far right. Jude's smash balls are 6-tile sprites in ROM order:
+the downward one is 2 columns by 3 rows, and the leftward one is 3 columns by 2 rows.
+Kyle's orb particles (`0xA246`, `0xA286`, and `0xA2C6`) share one row. The lightning
+(`0xA1C6`) is on the last row as a 16×8 piece: its bottom-left tile sits right of its
+top-left tile. The lightning's two transparent right-hand tiles (`0xA1E6`, `0xA1F6`) are
+not dumped or injected.
 
 `dump-art abilities` writes the 23 in-UI weapon and ability icons from
 `0x804E-0x860D` to `working/abilities-art.png` in ROM order. The 16×16 sprites

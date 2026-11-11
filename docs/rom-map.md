@@ -321,7 +321,7 @@ The sequence ends at `0xA305` inclusive; the next address is `0xA306` (CPU addre
 
 ### Jude animation, rod, and fireball sprites
 
-The sequence beginning at `0xA306` starts with nine standard movement and attack sprites in the same pose order as the other characters: two each idling down, up, and left, followed by one attack sprite facing down, up, and left. These are followed by Jude's rod, weak and higher-level fireballs, the rod-overhead pose, and his defeated sprite.
+The sequence beginning at `0xA306` starts with nine standard movement and attack sprites in the same pose order as the other characters: two each idling down, up, and left, followed by one attack sprite facing down, up, and left. These are followed by Jude's rod, weak fireball, and smash ball sprites, the earthquake spell pose, and his defeated sprite. `dump-art jude` and `inject-art jude` handle the rod, fireball, smash ball, and earthquake pieces; the standard poses and defeated sprite are handled the same way as the other characters.
 
 | Physical ROM range | Contents |
 |---|---|
@@ -336,8 +336,8 @@ The sequence beginning at `0xA306` starts with nine standard movement and attack
 | `0xA5C6-0xA605` | Jude's rod facing left |
 | `0xA606-0xA625` | Half-sprite of Jude's weak fireball facing down |
 | `0xA626-0xA645` | Half-sprite of Jude's weak fireball facing left; it appears split in two in the current visualization, like Pit's dagger |
-| `0xA646-0xA6C5` | Two higher-level fireball sprites; direction/order is unclear |
-| `0xA6C6-0xA705` | Third higher-level fireball sprite; direction/order is unclear |
+| `0xA646-0xA6A5` | First smash ball (large fireball), 6 tiles, facing down |
+| `0xA6A6-0xA705` | Second smash ball (large fireball), 6 tiles, facing left |
 | `0xA706-0xA745` | Top half of Jude holding the rod above his head |
 | `0xA746-0xA785` | Lower half of that pose, containing his body and all but the tip of his hat |
 | `0xA786-0xA7C5` | Jude defeated |
