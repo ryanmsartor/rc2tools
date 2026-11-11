@@ -1,15 +1,12 @@
 #!/usr/bin/env python3
-"""Extract documented character tables from a ROM or its hex dump."""
+"""Read documented character stat tables from a ROM or its hex dump."""
 
-import argparse
-import hashlib
-import json
 import re
-import sys
 from pathlib import Path
 
 ROM_SIZE = 0x20000
 LEVELS = 16
+VALUE_WIDTH = 3
 CHARACTERS = ("hero", "pit", "lane", "kyle", "jude", "lee", "lora", "zold")
 
 # Offsets and record fields are documented in docs/rom-map.md.
@@ -102,65 +99,29 @@ def read_rom(path: Path) -> bytes:
     return rom
 
 
-def extract_json(rom: bytes) -> dict:
-    """Read each mapped record directly from ROM, in level order."""
-    characters = {}
+def read_stats(rom: bytes) -> list[tuple[str, list[int]]]:
+    """Return (name, values) for each stat array, with LEVELS values per array."""
+    stats = []
     for index, name in enumerate(CHARACTERS):
         hp_start = 0x17065 + index * LEVELS
         mp_start = 0x170E5 + index * LEVELS
-        character = {
-            "hp": list(rom[hp_start:hp_start + LEVELS]),
-            "mp": list(rom[mp_start:mp_start + LEVELS]),
-            "abilities": {},
-        }
+        stats.append((f"{name}_hp", list(rom[hp_start:hp_start + LEVELS])))
+        stats.append((f"{name}_mp", list(rom[mp_start:mp_start + LEVELS])))
         for ability, offset, fields in ABILITIES[name]:
             width = len(fields)
-            character["abilities"][ability] = {
-                field: [rom[offset + level * width + column] for level in range(LEVELS)]
-                for column, field in enumerate(fields)
-            }
-        characters[name] = character
-    additional_tables = {}
+            for column, field in enumerate(fields):
+                values = [rom[offset + level * width + column] for level in range(LEVELS)]
+                stats.append((f"{name}_{ability}_{field}", values))
     for name, (offset, entries, width) in ADDITIONAL_TABLES.items():
-        if width == 1:
-            additional_tables[name] = list(rom[offset:offset + entries])
-        else:
-            additional_tables[name] = [
-                list(rom[offset + index * width:offset + (index + 1) * width])
-                for index in range(entries)
-            ]
-    return {"characters": characters, "additional_tables": additional_tables}
+        stats.append((f"{name}_table", list(rom[offset:offset + entries * width])))
+    return stats
 
 
-def output_path(root: Path, rom: bytes) -> Path:
-    """Return the output path named by the source ROM's SHA-256."""
-    digest = hashlib.sha256(rom).hexdigest()
-    return root / "output" / f"{digest}.json"
-
-
-def main() -> int:
-    root = Path(__file__).resolve().parent.parent
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument(
-        "input",
-        nargs="?",
-        type=Path,
-        default=root / "input" / "Rolan's Curse II (USA).gb",
-        help="ROM (.gb) or full xxd/Format-Hex dump (.hex)",
-    )
-    args = parser.parse_args()
-    try:
-        rom = read_rom(args.input)
-        game = extract_json(rom)
-        output = output_path(root, rom)
-        output.parent.mkdir(parents=True, exist_ok=True)
-        output.write_text(json.dumps(game, indent=2) + "\n", encoding="utf-8", newline="\n")
-    except (OSError, UnicodeError, ValueError) as error:
-        print(f"Error: {error}", file=sys.stderr)
-        return 1
-    print(f"Wrote {output}")
-    return 0
-
-
-if __name__ == "__main__":
-    sys.exit(main())
+def format_stats(stats: list[tuple[str, list[int]]]) -> str:
+    """Format arrays as `name: [v1, ...]`, aligning colons and right-aligning values."""
+    name_width = max(len(name) for name, _ in stats)
+    lines = []
+    for name, values in stats:
+        cells = ", ".join(f"{value:>{VALUE_WIDTH}}" for value in values)
+        lines.append(f"{name:<{name_width}}: [{cells}]")
+    return "\n".join(lines) + "\n"

@@ -136,7 +136,7 @@ class DumpTextTests(unittest.TestCase):
             (root / "bin").mkdir()
             (root / "input").mkdir()
             shutil.copy2(ROOT / "rc2t", root / "rc2t")
-            for name in ("dump_text.py", "render_text.py", "known_graphics.py", "extract_json.py"):
+            for name in ("dump_text.py", "render_text.py", "known_graphics.py", "rom_stats.py"):
                 shutil.copy2(ROOT / "bin" / name, root / "bin" / name)
             rom = root / "input" / "Rolan's Curse II (USA).gb"
             rom.write_bytes(self.rom)

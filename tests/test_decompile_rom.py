@@ -93,17 +93,17 @@ class DecompileRomTests(unittest.TestCase):
 
     def test_additional_annotations_cover_documented_tables_and_text(self):
         import dump_text
-        import extract_json
+        import rom_stats
 
         annotations = decompile_rom.ROM_ANNOTATIONS
         text_ranges = {(start, end) for start, end, category, label in annotations
                        if category == "Text" or label == "Unclassified control-byte fragment; not confirmed text"}
         self.assertEqual(text_ranges, {dump_text.TITLE_RANGE, *dump_text.TEXT_RANGES})
         table_ranges = {(start, end) for start, end, category, _ in annotations if category == "Table"}
-        for abilities in extract_json.ABILITIES.values():
+        for abilities in rom_stats.ABILITIES.values():
             for _, start, fields in abilities:
-                self.assertIn((start, start + extract_json.LEVELS * len(fields)), table_ranges)
-        for start, count, width in extract_json.ADDITIONAL_TABLES.values():
+                self.assertIn((start, start + rom_stats.LEVELS * len(fields)), table_ranges)
+        for start, count, width in rom_stats.ADDITIONAL_TABLES.values():
             self.assertIn((start, start + count * width), table_ranges)
         self.assertEqual(len([a for a in annotations if a[2] == "Table"]), 16 + 22 + 3)
 

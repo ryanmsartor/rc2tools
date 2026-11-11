@@ -8,7 +8,7 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
 
-from extract_json import read_rom
+from rom_stats import read_rom
 from known_graphics import KNOWN_GRAPHICS_RANGES
 
 TILE_BYTES = 16

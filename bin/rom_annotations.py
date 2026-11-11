@@ -5,7 +5,7 @@ the documented code or data ends there.
 """
 
 from dump_text import TEXT_RANGES, TITLE_RANGE
-from extract_json import ABILITIES, ADDITIONAL_TABLES, CHARACTERS, LEVELS
+from rom_stats import ABILITIES, ADDITIONAL_TABLES, CHARACTERS, LEVELS
 
 
 LANDMARKS = (

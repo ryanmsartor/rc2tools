@@ -26,7 +26,7 @@ class RecompileWrapperTests(unittest.TestCase):
         (self.root / "input").mkdir()
         shutil.copy2(ROOT / "rc2t", self.root / "rc2t")
         for name in ("decompile_rom.py", "recompile_rom.py", "sprite_annotations.py",
-                     "rom_annotations.py", "dump_text.py", "render_text.py", "known_graphics.py", "extract_json.py"):
+                     "rom_annotations.py", "dump_text.py", "render_text.py", "known_graphics.py", "rom_stats.py"):
             shutil.copy2(ROOT / "bin" / name, self.root / "bin" / name)
 
     def run_wrapper(self, command, *args, env=None):

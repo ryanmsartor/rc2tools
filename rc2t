@@ -10,7 +10,6 @@ rc2t_print_help_message() {
     echo "Commands:"
     echo "  dump-hex             Dump the contents in hexadecimal"
     echo "  check-hash           Check the hash"
-    echo "  extract-json         [rom-or-hex]  Extract character stats into output/<rom-sha256>.json"
     echo "  render-graphics | rg [start [end [WxH|output]]] [options]  Render ROM tiles (default: entire ROM)"
     echo "    --highlight-known  Shade documented graphics in blue, text in yellow, lookup or stat tables in green, and tilemaps, tables, and routines in purple"
     echo "    --compare          Compare input/ with the working hack; same bytes are green, different bytes grayscale"
@@ -29,6 +28,7 @@ rc2t_print_help_message() {
     echo "    swap-char-sprite <char1> <char2>  Swap two characters' sprites and POW portraits"
     echo "    dump-art <name|all>               Export title, character, or NPC art to working/<name>-art.png"
     echo "    inject-art <name|all>             Apply working/<name>-art.png to the in-progress hack"
+    echo "    dump-stats [rom-or-hex]           Write character stat arrays to working/stats.txt"
 }
 
 _check_if_rom_exists() {
@@ -60,14 +60,6 @@ case "$1" in
     dump-hex)
         _check_if_rom_exists
         xxd "input/$ROM_NAME" > "output/$ROM_NAME.hex"
-        ;;
-
-    extract-json)
-        if [ "$#" -gt 2 ]; then
-            echo "Error: extract-json accepts at most one input path." >&2
-            exit 1
-        fi
-        python3 bin/extract_json.py "${@:2}"
         ;;
 
     render-graphics|rg)

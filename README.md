@@ -4,31 +4,25 @@ A collection of tools for hacking Rolan's Curse 2 for Game Boy
 For project licensing, game rights, and third-party credits, see
 [LEGAL.md](LEGAL.md).
 
-## Extract character stats
+## Requirements and dependencies
 
-Requires Python 3.10 or later and Bash. From the repository root, run:
+- Python 3.10 or later.
+- Bash, to run the `rc2t` and `rc2h` launchers.
+- Pillow 10.0 or later, required by `render-graphics` and by `dump-art` and
+  `inject-art`. Install it with:
 
-```sh
-./rc2t extract-json
-```
+  ```sh
+  python3 -m pip install 'Pillow>=10.0'
+  ```
 
-This reads `input/Rolan's Curse II (USA).gb` and writes
-`output/<rom-sha256>.json`, using the lowercase SHA-256 hash of the ROM bytes
-as the filename. A different ROM revision therefore gets a different output
-file.
-Alternatively, supply a ROM or a complete 16-byte-per-row `.hex` dump produced
-by `xxd` or PowerShell `Format-Hex`:
+- A copy of Rolan's Curse II (USA) in `input/` as `Rolan's Curse II (USA).gb`
+  (131,072 bytes). These tools were built and tested against this exact ROM
+  version. Use these identifiers to confirm you have this file:
+  - SHA-256: `cf3f8f41498cdd32f5b3ee0cdccde1901b073798f3edac1a7d9ccc0141cb16be`
+  - MD5: `27f2c99b13cbdb5a5be4afce87b9039b`
+  Other versions of Rolan's Curse II may work, but are untested and not guaranteed to be compatible.
 
-```sh
-./rc2t extract-json "input/Rolan's Curse II (USA).gb.hex"
-```
-
-The command reads the mapped bytes from the supplied input, so modified stat
-values are reflected in the output. It checks the ROM size and header, not a
-fixed hash or expected stat values. Arrays contain decimal byte values for
-levels 1 through 16; the mappings and their unresolved interpretations are
-documented in [the ROM map](docs/rom-map.md). The output file is overwritten
-if a file with that ROM hash already exists.
+- Optional: `xxd` or PowerShell `Format-Hex`, to create the `.hex` dump that `dump-stats` can read.
 
 ## Disassemble a Game Boy ROM
 
@@ -60,7 +54,6 @@ continue into a selected range without changing the linear disassembly.
 
 ### Recompile an assembly listing
 
-The recompiler uses Python 3.10 or later and requires no external assembler.
 Copy or move the `.asm` file into `input/`, then run:
 
 ```sh
@@ -89,12 +82,6 @@ omitted bytes. Regenerate listings made by older versions of the disassembler
 before recompiling them.
 
 ## Render graphics as tile grids, sprites, and portraits
-
-Rendering requires Pillow 10.0 or later. Install it with:
-
-```sh
-python3 -m pip install 'Pillow>=10.0'
-```
 
 To render the entire default ROM (including non-graphics data) to
 `output/graphics.png`, run:
@@ -272,6 +259,7 @@ or `--help`, to see its commands.
 ./rc2h inject-art <name>               # apply working/<name>-art.png to the in-progress copy
 ./rc2h dump-font                       # synonym for dump-art font
 ./rc2h inject-font                     # synonym for inject-art font
+./rc2h dump-stats [rom-or-hex]         # write character stat arrays to working/stats.txt
 ```
 
 Both `dump-art` and `inject-art` accept the same names:
@@ -290,101 +278,45 @@ existing PNGs, and injection records each applied image in `hacks.txt`.
 Processing stops on the first error; earlier dumps or injections remain in
 place.
 
-`dump-art npc` writes `working/npc-art.png`, a 1:1 sheet of all 120 frames from
-the idle town NPCs (`0x1861E-0x18A1D`) and the NPC and non-boss enemy sprites
-(`0xE25A-0xFD59`). Each 16×16 sprite occupies a 17-pixel cell with a 1-pixel
-red separator, twelve cells per row, with no labels. Each NPC or enemy's frames
-stay together in one row. The two-frame sets are at the top, the four-pose sets
-in the middle, and the six-pose sets at the bottom. The last two-frame row also
-holds the first four-pose set. The idle egghead and dog frames are
-byte-identical to their enemy copies (`0xE25A` and `0xE2DA`), so only the enemy
-copies are dumped. The energy orbs are not included.
-
-`inject-art npc` reads that sheet back and rewrites the 120 sprites. Each
-edited egghead or dog frame is also written to its idle copy, so both locations
-stay identical. Red separators are ignored. Each pixel is mapped to the nearest
-of the four sprite shades. The image must be exactly 203×169 pixels, or
+Each target exports one PNG to `working/` at native pixel size, and injection reads
+that PNG back. Red marks separators and empty space, which injection ignores. Each
+pixel is mapped to the nearest shade. If the image is not the expected size,
 injection fails and changes nothing.
 
-`dump-font` (also `dump-art font`) writes `working/font-art.png`, a 1:1 sheet of
-the 48 glyphs stored as 24 stacked 1bpp tiles at `0xB986-0xBB05`. Each glyph is
-an 8×8 cell with a 1-pixel red separator between cells, six cells per row, eight
-rows. Glyphs follow ROM order, left to right and then top to bottom, so each
-tile's top glyph is followed by its bottom glyph (the top row is glyphs 0-5).
-Dark pixels are ink (clear bits) and light pixels are background (set bits).
-`inject-font` (also `inject-art font`) reads the sheet back, thresholds each
-pixel to ink or background, and rewrites those 0x180 bytes. Red separators are
-ignored. The image must be exactly 53×71 pixels, or injection fails and changes
-nothing. The font is included in `dump-art all` and `inject-art all`.
+`dump-art npc` exports the town NPC frames and the NPC and non-boss enemy sprites as
+one sheet. Injection writes each edited egghead or dog frame to both of its identical
+copies, so the copies stay the same.
+
+`dump-art font` (also `dump-font`) exports the font glyphs as one sheet. Injection
+thresholds each pixel to ink or background. The font is included in `dump-art all`
+and `inject-art all`.
+
+`dump-stats` writes the character stat arrays to `working/stats.txt`, one array per
+line, with values for levels 1 through 16. It reads the in-progress copy by default.
+Pass a ROM (`.gb`) or a complete 16-byte-per-row `.hex` dump to read another file
+instead. It checks the ROM size and header, not a fixed hash or expected stat values.
+It does not record anything in `hacks.txt`. The mappings and their unresolved
+interpretations are documented in [the ROM map](docs/rom-map.md).
 
 Character names for `swap-char-sprite` are `hero`, `pit`, `lane`, `kyle`,
 `jude`, `lee`, `lora`, and `zold`. The swap exchanges the nine standard poses,
 defeat sprite, level-up face, and POW-screen portrait of the two characters.
 
-`dump-art <character>` exports those character graphics to
-`working/<character>-art.png` at native pixel size. The first
-three columns have rows for down, left, and up: two idle poses and an attack
-pose in each row. The 32×32 POW portrait is to their right, with the defeated
-sprite and level-up face below it. Red lines and padding separate the images.
-`inject-art <character>` reads the corresponding PNG and replaces only that
-character's nine standard poses, defeated sprite, level-up face, POW portrait, and
-every attack sheet below them in the in-progress ROM. Sheet sizes are hero
-118×67, pit 84×84, lane 84×67, kyle 84×93, jude 135×50, lee 84×93, lora 84×84, and
-zold 84×84. Pixel colors are converted to grayscale and
-mapped to the nearest of the four hack-art shades (index 0 is light gray and
-transparent in-game for sprites, 1 is black, 2 is dark gray, and 3 is white). POW
-portraits keep their original palette. Red separators and padding are ignored, and
-image transparency is not used.
+`dump-art <character>` exports one character's sprites, including its poses, POW
+portrait, defeat sprite, level-up face, and attack and particle sprites. `inject-art
+<character>` writes them back. The hero's sheet also includes its sword and
+electric-ball sprites.
 
-The hero sheet is 118×67 because it also holds the hero's sword, sword arcs, and
-electric-ball halves (`0x9346-0x95C5`). The three sword sprites sit below the poses,
-followed by the two electric-ball halves. All four sword arcs are clustered to the right
-of the portrait: the left-facing arcs (tiles 7-12 and 19-24) sit beside it, with the
-downward arc of tiles 1-6 below them and the downward arc of tiles 13-18 below that.
-Arc tiles are numbered 1-24 in ROM order (tile 1 is at `0x9406`, tile 24 at
-`0x9576`). Solid red cells are empty filler that is not ROM graphics, so
-`inject-art hero` ignores them and never writes to them.
+`dump-art abilities` exports the in-UI weapon and ability icons. `inject-art
+abilities` writes them back.
 
-`dump-art pit`, `dump-art lane`, `dump-art kyle`, `dump-art lee`, `dump-art lora`, and
-`dump-art zold` add a grid of each character's attack and particle sprites below the
-poses, starting at y=51, with five sprites per row. `inject-art` writes every one of
-these sheets back. Pit has eight sprites (84×84), lane has four (84×67), kyle has eleven
-(84×93), Lee has eleven (84×93), Lora has ten (84×84), and Zold has nine (84×84). Each
-figure is centered in a 16-pixel-wide cell, with a 1-pixel red separator between cells,
-and each row is as tall as its tallest figure. Half-sprites (8×16 or 16×8) are placed so
-that multi-tile pieces form a complete image.
-`dump-art jude` instead places its eight attack figures individually on a 135×50 sheet,
-and `inject-art jude` writes them back. The earthquake pose (16×32) and the two smash balls
-sit right of the POW portrait, the small leftward fireball sits under the tall smash ball,
-the small downward fireball sits right of the leftward smash ball, and the three rods are
-stacked in a column at the far right. Jude's smash balls are 6-tile sprites in ROM order:
-the downward one is 2 columns by 3 rows, and the leftward one is 3 columns by 2 rows.
-Kyle's orb particles (`0xA246`, `0xA286`, and `0xA2C6`) share one row. The lightning
-(`0xA1C6`) is on the last row as a 16×8 piece: its bottom-left tile sits right of its
-top-left tile. The lightning's two transparent right-hand tiles (`0xA1E6`, `0xA1F6`) are
-not dumped or injected.
+`dump-art title` exports the title screen logo, the art above the START/CONTINUE
+line. The menu cursor, the START and CONTINUE text, and the copyright line are not
+part of the image, and the blank margin around the logo stays untouched in the ROM.
 
-`dump-art abilities` writes the 23 in-UI weapon and ability icons from
-`0x804E-0x860D` to `working/abilities-art.png` in ROM order. The 16×16 sprites
-are shown at native size with the NPC sprite palette, six per row, separated by
-one-pixel red gutters; unused sheet space is also red. `inject-art abilities`
-reads the same 101×67 sheet, maps pixels to the nearest NPC sprite palette
-shade, ignores the red gutters, and rewrites only the 23 icon sprites.
-
-`dump-art title` writes the title screen's logo above the START/CONTINUE line to
-`working/title-art.png`. The image is 160×88 pixels: the art's 11 rows of
-8×8 cells, arranged as they appear on screen. The blank top and bottom rows of
-the 13-row grid are left out of the image and stay in the ROM as a margin, so
-`inject-art` never changes them. The four
-shades are the title screen's palette (BGP `0x2D`): index 0 is light gray, 1 is
-black, 2 is dark gray, and 3 is white. The menu cursor, the START and CONTINUE
-text, and the copyright line are not part of the image.
-
-`inject-art title` reads `working/title-art.png` and writes the tiles back into
-the in-progress copy. The image must be exactly 160×88 pixels. Each pixel is
-mapped to the nearest of the four shades. Some tiles appear in more than one
-cell, such as the blank filler tile `0x30`, so every cell that uses such a tile
-must have the same pixels. Otherwise `inject-art` fails and changes nothing.
+`inject-art title` writes the logo back into the in-progress copy. Injection fails
+and changes nothing if the image is the wrong size, or if tiles that appear in more
+than one place disagree.
 
 Each applied hack is recorded in `working/hacks.txt`, one line per hack. `reset`
 and `clear` delete this file, and `swap-char-sprite`, `inject-art`, and `inject-font` append to it.

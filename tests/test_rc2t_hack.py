@@ -40,7 +40,7 @@ class HackWrapperTests(unittest.TestCase):
         shutil.copy2(ROOT / "rc2h", self.root / "rc2h")
         for name in ("hack_rom.py", "swap_character_sprite.py", "ability_art.py", "sprite_art.py",
                      "art_layout.py", "character_art.py", "font_art.py", "npc_art.py", "render_graphics.py",
-                     "known_graphics.py", "extract_json.py"):
+                     "known_graphics.py", "rom_stats.py"):
             shutil.copy2(ROOT / "bin" / name, self.root / "bin" / name)
         self.rom = bytes(range(256)) * 0x200
         (self.root / "input" / ROM_NAME).write_bytes(self.rom)
@@ -745,6 +745,32 @@ class HackWrapperTests(unittest.TestCase):
         self.assertIn("ROM does not contain the stacked font tiles", result.stderr)
         self.assertEqual(self.working.read_bytes(), before)
         self.assertEqual(self.hacks_log.read_text(), "")
+
+    def test_dump_stats_writes_aligned_arrays_without_logging(self):
+        rom = bytearray(0x20000)
+        rom[0x134:0x143] = b"ROLAN'S CURSE 2"
+        rom[0x147:0x149] = b"\x06\x02"
+        rom[0x17065] = 7
+        self.use_input_rom(bytes(rom))
+        self.run_wrapper("reset")
+        log_before = self.hacks_log.read_text() if self.hacks_log.exists() else ""
+        result = self.run_wrapper("dump-stats")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        lines = (self.root / "working" / "stats.txt").read_text(encoding="utf-8").splitlines()
+        self.assertEqual(len(lines), 63)
+        self.assertEqual(len({line.index(":") for line in lines}), 1)
+        self.assertTrue(lines[0].startswith("hero_hp"))
+        self.assertIn("[  7,", lines[0])
+        self.assertEqual(lines[0].count(", "), 15)
+        log_after = self.hacks_log.read_text() if self.hacks_log.exists() else ""
+        self.assertEqual(log_after, log_before)
+
+    def test_dump_stats_rejects_wrong_rom_without_writing(self):
+        self.use_input_rom(bytes(0x1000))
+        result = self.run_wrapper("dump-stats", str(self.root / "input" / ROM_NAME))
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("expected a 131072-byte ROM", result.stderr)
+        self.assertFalse((self.root / "working" / "stats.txt").exists())
 
 
 if __name__ == "__main__":

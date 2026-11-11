@@ -13,6 +13,7 @@ from art_layout import ART_LAYOUTS, apply_art, render_art
 from character_art import apply_character_art, render_character_art
 from font_art import apply_font_art, render_font_art
 from npc_art import apply_npc_art, render_npc_art
+from rom_stats import format_stats, read_rom, read_stats
 from swap_character_sprite import CHARACTER_SPRITES, swap_character_sprites
 
 
@@ -186,6 +187,12 @@ def _finalize_tag(value: str) -> str:
     return value
 
 
+def dump_stats(source: Path) -> None:
+    output = WORKING_DIR / "stats.txt"
+    output.write_text(format_stats(read_stats(read_rom(source))), encoding="utf-8", newline="\n")
+    print(f"Wrote {output}")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(prog="rc2t hack", description=__doc__)
     subparsers = parser.add_subparsers(dest="subcommand", required=True, metavar="<subcommand>")
@@ -222,6 +229,14 @@ def main() -> int:
         "inject-font",
         help="synonym for inject-art font: apply working/font-art.png to the in-progress hack",
     )
+    stats_parser = subparsers.add_parser(
+        "dump-stats",
+        help="write character stat arrays to working/stats.txt",
+    )
+    stats_parser.add_argument(
+        "source", nargs="?", default=WORKING_ROM_PATH, type=Path,
+        help="ROM (.gb) or full hex dump (.hex) to read (default: the in-progress hack)",
+    )
     argv = sys.argv[1:]
     # Accept the original command name without listing it in help.
     if argv[:1] == [SWAP_ALIAS]:
@@ -252,6 +267,8 @@ def main() -> int:
         elif args.subcommand == "inject-font":
             read_art("font")
             record_hack("inject-font")
+        elif args.subcommand == "dump-stats":
+            dump_stats(args.source)
     except (OSError, ValueError) as error:
         print(f"Error: {error}", file=sys.stderr)
         return 1
