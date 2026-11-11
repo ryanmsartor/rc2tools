@@ -1,13 +1,9 @@
 import random
-import sys
 import unittest
-from pathlib import Path
 
 from PIL import Image
 
-
-ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT / "bin"))
+from tests.support import blank_rom
 
 from ability_art import (  # noqa: E402
     ABILITY_COUNT,
@@ -27,7 +23,7 @@ class AbilityArtTests(unittest.TestCase):
         self.assertEqual(rom, original)
 
     def test_inject_maps_palette_pixels_and_ignores_gutters(self):
-        rom = bytearray(0x20000)
+        rom = blank_rom()
         image = render_ability_art(rom)
         expected = bytearray(rom)
         for index in range(ABILITY_COUNT):

@@ -2,7 +2,8 @@
 
 from PIL import Image
 
-from render_graphics import TILE_BYTES, TILE_WIDTH, render_stacked_glyphs
+from render_graphics import render_stacked_glyphs
+from tiles import TILE_BYTES, TILE_WIDTH
 
 
 FONT_START = 0xB986

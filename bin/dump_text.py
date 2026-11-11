@@ -5,7 +5,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from rom_stats import read_rom
+from rom_io import read_rom
 from render_text import DEFAULT_ROM, decode, glyph_for
 
 ROOT = Path(__file__).resolve().parent.parent

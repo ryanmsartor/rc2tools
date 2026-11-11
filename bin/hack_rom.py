@@ -13,7 +13,8 @@ from art_layout import ART_LAYOUTS, apply_art, render_art
 from character_art import apply_character_art, render_character_art
 from font_art import apply_font_art, render_font_art
 from npc_art import apply_npc_art, render_npc_art
-from rom_stats import format_stats, read_rom, read_stats
+from rom_io import read_rom
+from rom_stats import format_stats, read_stats
 from swap_character_sprite import CHARACTER_SPRITES, swap_character_sprites
 
 
@@ -27,7 +28,31 @@ OUTPUT_DIR = ROOT / "output"
 DEFAULT_FINALIZE_TAG = "hack finalized"
 SWAP_SUBCOMMAND = "swap-char-sprite"
 SWAP_ALIAS = "swap-character-sprite"
-ART_NAMES = (*ART_LAYOUTS, *CHARACTER_SPRITES, "npc", "abilities", "font")
+
+
+def _layout_handlers(name: str):
+    layout = ART_LAYOUTS[name]
+    return (
+        lambda rom: render_art(layout, rom),
+        lambda rom, image: apply_art(layout, rom, image),
+    )
+
+
+def _character_handlers(character: str):
+    return (
+        lambda rom: render_character_art(rom, character),
+        lambda rom, image: apply_character_art(rom, character, image),
+    )
+
+
+ART_HANDLERS = {
+    **{name: _layout_handlers(name) for name in ART_LAYOUTS},
+    **{name: _character_handlers(name) for name in CHARACTER_SPRITES},
+    "npc": (render_npc_art, apply_npc_art),
+    "abilities": (render_ability_art, apply_ability_art),
+    "font": (render_font_art, apply_font_art),
+}
+ART_NAMES = tuple(ART_HANDLERS)
 IPS_HEADER = b"PATCH"
 IPS_EOF = b"EOF"
 IPS_EOF_OFFSET = int.from_bytes(IPS_EOF, "big")
@@ -110,36 +135,19 @@ def art_png_path(name: str) -> Path:
 
 
 def dump_art(name: str) -> None:
-    rom = WORKING_ROM_PATH.read_bytes()
-    if name == "abilities":
-        image = render_ability_art(rom)
-    elif name == "npc":
-        image = render_npc_art(rom)
-    elif name == "font":
-        image = render_font_art(rom)
-    elif name in CHARACTER_SPRITES:
-        image = render_character_art(rom, name)
-    else:
-        image = render_art(ART_LAYOUTS[name], rom)
+    render, _ = ART_HANDLERS[name]
+    image = render(WORKING_ROM_PATH.read_bytes())
     path = art_png_path(name)
     image.save(path)
     print(f"Wrote {path}")
 
 
 def read_art(name: str) -> None:
+    _, apply = ART_HANDLERS[name]
     rom = bytearray(WORKING_ROM_PATH.read_bytes())
     path = art_png_path(name)
     with Image.open(path) as image:
-        if name == "npc":
-            apply_npc_art(rom, image)
-        elif name == "abilities":
-            apply_ability_art(rom, image)
-        elif name == "font":
-            apply_font_art(rom, image)
-        elif name in CHARACTER_SPRITES:
-            apply_character_art(rom, name, image)
-        else:
-            apply_art(ART_LAYOUTS[name], rom, image)
+        apply(rom, image)
     WORKING_ROM_PATH.write_bytes(rom)
     print(f"Applied {path} to {WORKING_ROM_PATH}")
 

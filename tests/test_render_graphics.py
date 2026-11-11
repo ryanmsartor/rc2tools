@@ -1,5 +1,4 @@
 import argparse
-import importlib.util
 import sys
 import tempfile
 import unittest
@@ -8,12 +7,9 @@ from unittest.mock import patch
 
 from PIL import Image
 
+from tests.support import blank_rom, load_bin_module
 
-ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT / "bin"))
-SPEC = importlib.util.spec_from_file_location("render_graphics", ROOT / "bin" / "render_graphics.py")
-render_graphics = importlib.util.module_from_spec(SPEC)
-SPEC.loader.exec_module(render_graphics)
+render_graphics = load_bin_module("render_graphics")
 
 
 def blue_count(colors):
@@ -652,9 +648,7 @@ class RenderGraphicsTests(unittest.TestCase):
         )
 
     def test_cli_renders_portrait_mode(self):
-        rom = bytearray(0x20000)
-        rom[0x134:0x143] = b"ROLAN'S CURSE 2"
-        rom[0x147:0x149] = b"\x06\x02"
+        rom = blank_rom(header=True)
 
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -672,9 +666,7 @@ class RenderGraphicsTests(unittest.TestCase):
                 self.assertIn(render_graphics.PORTRAIT_PALETTE[0], colors)
 
     def test_cli_renders_custom_tile_grid(self):
-        rom = bytearray(0x20000)
-        rom[0x134:0x143] = b"ROLAN'S CURSE 2"
-        rom[0x147:0x149] = b"\x06\x02"
+        rom = blank_rom(header=True)
         rom[0x1000] = 0x80
 
         with tempfile.TemporaryDirectory() as directory:
@@ -694,9 +686,7 @@ class RenderGraphicsTests(unittest.TestCase):
                 self.assertIn(render_graphics.DEFAULT_PALETTE[1], colors)
 
     def test_cli_highlights_known_sprites(self):
-        rom = bytearray(0x20000)
-        rom[0x134:0x143] = b"ROLAN'S CURSE 2"
-        rom[0x147:0x149] = b"\x06\x02"
+        rom = blank_rom(header=True)
         rom[0x8040:0x8060] = bytes([0xFF, 0]) * 16
 
         with tempfile.TemporaryDirectory() as directory:
@@ -715,9 +705,7 @@ class RenderGraphicsTests(unittest.TestCase):
                 self.assertTrue(any(color in render_graphics.BLUESCALE_PALETTE for color in colors))
 
     def test_cli_highlights_known_tiles_in_custom_grid(self):
-        rom = bytearray(0x20000)
-        rom[0x134:0x143] = b"ROLAN'S CURSE 2"
-        rom[0x147:0x149] = b"\x06\x02"
+        rom = blank_rom(header=True)
         rom[0x8040:0x80A0] = bytes([0xFF, 0]) * 48
 
         with tempfile.TemporaryDirectory() as directory:
@@ -737,9 +725,7 @@ class RenderGraphicsTests(unittest.TestCase):
                 self.assertTrue(any(color in render_graphics.BLUESCALE_PALETTE for color in colors))
 
     def test_cli_highlights_known_tiles_in_portrait_mode(self):
-        rom = bytearray(0x20000)
-        rom[0x134:0x143] = b"ROLAN'S CURSE 2"
-        rom[0x147:0x149] = b"\x06\x02"
+        rom = blank_rom(header=True)
         rom[0x8800:0x8900] = bytes([0xFF, 0]) * 128
 
         with tempfile.TemporaryDirectory() as directory:
@@ -759,9 +745,7 @@ class RenderGraphicsTests(unittest.TestCase):
                 self.assertTrue(any(color in render_graphics.BLUESCALE_PALETTE for color in colors))
 
     def test_cli_writes_png_for_a_rom_range(self):
-        rom = bytearray(0x20000)
-        rom[0x134:0x143] = b"ROLAN'S CURSE 2"
-        rom[0x147:0x149] = b"\x06\x02"
+        rom = blank_rom(header=True)
         rom[0x1000] = 0x80
 
         with tempfile.TemporaryDirectory() as directory:
@@ -784,9 +768,7 @@ class RenderGraphicsTests(unittest.TestCase):
                 self.assertTrue(any(pixel != (255, 255, 255) for pixel in top_axis.getdata()))
 
     def test_cli_writes_jpeg(self):
-        rom = bytearray(0x20000)
-        rom[0x134:0x143] = b"ROLAN'S CURSE 2"
-        rom[0x147:0x149] = b"\x06\x02"
+        rom = blank_rom(header=True)
 
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

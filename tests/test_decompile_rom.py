@@ -1,28 +1,18 @@
-import importlib.util
 import re
-import sys
 import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT / "bin"))
-try:
-    SPEC = importlib.util.spec_from_file_location("decompile_rom", ROOT / "bin" / "decompile_rom.py")
-    decompile_rom = importlib.util.module_from_spec(SPEC)
-    SPEC.loader.exec_module(decompile_rom)
-finally:
-    sys.path.pop(0)
+from tests.support import ROOT, blank_rom, load_bin_module
+
+decompile_rom = load_bin_module("decompile_rom")
 
 
 class DecompileRomTests(unittest.TestCase):
     @staticmethod
     def target_rom():
-        rom = bytearray(0x20000)
-        rom[0x134:0x143] = b"ROLAN'S CURSE 2"
-        rom[0x147:0x149] = b"\x06\x02"
-        return rom
+        return blank_rom(header=True)
 
     def test_sprite_registry_matches_documented_character_and_item_ranges(self):
         documentation = (ROOT / "docs" / "rom-map.md").read_text(encoding="utf-8")

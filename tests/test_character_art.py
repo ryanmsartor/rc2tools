@@ -1,19 +1,15 @@
 import random
-import sys
 import unittest
-from pathlib import Path
 
 from PIL import Image
 
-
-ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT / "bin"))
+from tests.support import blank_rom
 
 from character_art import (  # noqa: E402
     ATTACK_FIGURES, HERO_FIGURES, apply_character_art, character_sheet_size, render_character_art,
 )
-from art_layout import _encode_tile  # noqa: E402
-from render_graphics import DEFAULT_PALETTE, HACK_ART_PALETTE, PORTRAIT_PALETTE, TILE_BYTES, TILE_WIDTH  # noqa: E402
+from render_graphics import DEFAULT_PALETTE, HACK_ART_PALETTE, PORTRAIT_PALETTE  # noqa: E402
+from tiles import TILE_BYTES, TILE_WIDTH, encode_tile  # noqa: E402
 from sprite_art import Piece, paste_piece  # noqa: E402
 from swap_character_sprite import CHARACTER_SPRITES, SPRITE_BYTES, STANDARD_SPRITE_BYTES  # noqa: E402
 
@@ -30,7 +26,7 @@ def id_tile(tile_id):
     """Encode a 16-bit id in the eight pixels of a tile's top row so each placed tile can be traced."""
     rows = [[0] * 8 for _ in range(8)]
     rows[0] = [(tile_id >> shift) & 3 for shift in range(0, 16, 2)]
-    return _encode_tile(rows)
+    return encode_tile(rows)
 
 
 def read_tile_id(image, x, y):
@@ -40,7 +36,7 @@ def read_tile_id(image, x, y):
 
 class CharacterArtTests(unittest.TestCase):
     def test_graphics_are_assembled_and_separated(self):
-        rom = bytearray(0x20000)
+        rom = blank_rom()
         for character, (standard, defeated, face, portrait) in CHARACTER_SPRITES.items():
             offsets = [standard + index * SPRITE_BYTES for index in range(9)] + [defeated, face]
             for index, offset in enumerate(offsets):
@@ -85,7 +81,7 @@ class CharacterArtTests(unittest.TestCase):
             render_character_art(bytes(0x20000), "unknown")
 
     def test_hero_band_places_each_tile_at_its_figure_position(self):
-        rom = bytearray(0x20000)
+        rom = blank_rom()
         for offset in range(HERO_BAND_START, HERO_BAND_END, TILE_BYTES):
             rom[offset:offset + TILE_BYTES] = id_tile((offset // TILE_BYTES) & 0x3F)
         image = render_character_art(bytes(rom), "hero")
@@ -165,7 +161,7 @@ class CharacterArtTests(unittest.TestCase):
                 self.assertEqual(rom, expected)
 
     def test_inject_quantizes_using_each_region_palette(self):
-        rom = bytearray(0x20000)
+        rom = blank_rom()
         image = render_character_art(rom, "hero")
         image.putpixel((0, 0), (90, 90, 90))
         image.putpixel((51, 0), (90, 90, 90))

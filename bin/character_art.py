@@ -2,15 +2,13 @@
 
 from PIL import Image, ImageDraw
 
-from art_layout import _encode_tile
 from render_graphics import (
     PORTRAIT_PALETTE,
-    TILE_BYTES,
-    TILE_WIDTH,
     render_portraits,
 )
 from sprite_art import Piece, apply_piece, apply_sprite_art, paste_piece, render_sprite
 from swap_character_sprite import CHARACTER_SPRITES, POW_PORTRAIT_BYTES, SPRITE_BYTES
+from tiles import TILE_BYTES, TILE_WIDTH, encode_tile
 
 DEFAULT_SHEET_SIZE = (84, 50)
 HERO_ARC_START = 0x9406
@@ -232,7 +230,7 @@ def apply_character_art(rom: bytearray, character: str, image: Image.Image) -> N
                  for px in range(TILE_WIDTH)]
                 for py in range(TILE_WIDTH)
             ]
-            writes.append((offset + tile * TILE_BYTES, _encode_tile(rows)))
+            writes.append((offset + tile * TILE_BYTES, encode_tile(rows)))
 
     for index, offset in enumerate(offsets):
         x, y = _sprite_position(index)

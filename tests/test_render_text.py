@@ -1,17 +1,10 @@
-import importlib.util
-import sys
 import tempfile
 import unittest
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent
-SPEC = importlib.util.spec_from_file_location("render_text", ROOT / "bin" / "render_text.py")
-render_text = importlib.util.module_from_spec(SPEC)
-sys.path.insert(0, str(ROOT / "bin"))
-try:
-    SPEC.loader.exec_module(render_text)
-finally:
-    sys.path.pop(0)
+from tests.support import load_bin_module
+
+render_text = load_bin_module("render_text")
 
 
 class RenderTextTests(unittest.TestCase):

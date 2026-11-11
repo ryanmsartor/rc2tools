@@ -1,14 +1,10 @@
 import random
 import struct
-import sys
 import unittest
-from pathlib import Path
 
 from PIL import Image
 
-
-ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT / "bin"))
+from tests.support import ROM_SIZE, blank_rom
 
 import art_layout  # noqa: E402
 
@@ -17,7 +13,6 @@ TITLE_END = 0x1B0FD
 TILEMAP = 0x13C34
 POINTER = 0x1800A
 STOCK_LIST = 0x18110
-ROM_SIZE = 0x20000
 CELLS = 20 * 13
 IMAGE_CELLS = 20 * 11
 FREE_RUNS = ((0x61, 0x100), (0x3FC6, 0x3FFF), (0x1BF80, 0x1C000))
@@ -25,7 +20,7 @@ FREE_RUNS = ((0x61, 0x100), (0x3FC6, 0x3FFF), (0x1BF80, 0x1C000))
 
 def title_rom(seed=1):
     rng = random.Random(seed)
-    rom = bytearray(b"\xff" * ROM_SIZE)
+    rom = blank_rom(fill=0xFF)
     for offset in range(TITLE_START, TITLE_END + 1):
         rom[offset] = rng.getrandbits(8)
     stock_ids = list(range(0x31, 0xD3))

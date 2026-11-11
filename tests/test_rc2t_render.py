@@ -1,5 +1,4 @@
 import importlib.util
-import shutil
 import subprocess
 import sys
 import tempfile
@@ -8,8 +7,7 @@ from pathlib import Path
 
 from PIL import Image
 
-
-ROOT = Path(__file__).resolve().parent.parent
+from tests.support import blank_rom, copy_tool_tree
 
 
 class RenderGraphicsWrapperTests(unittest.TestCase):
@@ -17,17 +15,12 @@ class RenderGraphicsWrapperTests(unittest.TestCase):
         self.temporary = tempfile.TemporaryDirectory()
         self.addCleanup(self.temporary.cleanup)
         self.root = Path(self.temporary.name)
-        (self.root / "bin").mkdir()
         (self.root / "input").mkdir()
-        shutil.copy2(ROOT / "rc2t", self.root / "rc2t")
-        for name in ("render_graphics.py", "known_graphics.py", "rom_stats.py"):
-            shutil.copy2(ROOT / "bin" / name, self.root / "bin" / name)
+        copy_tool_tree(self.root)
         bin_path = str(self.root / "bin")
         sys.path.insert(0, bin_path)
         self.addCleanup(sys.path.remove, bin_path)
-        rom = bytearray(0x20000)
-        rom[0x134:0x143] = b"ROLAN'S CURSE 2"
-        rom[0x147:0x149] = b"\x06\x02"
+        rom = blank_rom(header=True)
         rom[0x1000] = 0x80
         rom[0x1FFF0] = 0x80
         rom[0x1FFFF] = 0x80

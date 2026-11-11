@@ -1,4 +1,3 @@
-import shutil
 import subprocess
 import tempfile
 import unittest
@@ -6,8 +5,9 @@ from pathlib import Path
 
 from PIL import Image
 
+from tests.support import blank_rom, copy_tool_tree
 
-ROOT = Path(__file__).resolve().parent.parent
+
 ROM_NAME = "Rolan's Curse II (USA).gb"
 WORKING_NAME = "Rolan's Curse II (USA) (hack in progress).gb"
 FINALIZED_STEM = "Rolan's Curse II (USA) (hack finalized)"
@@ -33,22 +33,16 @@ class HackWrapperTests(unittest.TestCase):
         self.temporary = tempfile.TemporaryDirectory()
         self.addCleanup(self.temporary.cleanup)
         self.root = Path(self.temporary.name)
-        (self.root / "bin").mkdir()
         (self.root / "input").mkdir()
         (self.root / "output").mkdir()
-        shutil.copy2(ROOT / "rc2t", self.root / "rc2t")
-        shutil.copy2(ROOT / "rc2h", self.root / "rc2h")
-        for name in ("hack_rom.py", "swap_character_sprite.py", "ability_art.py", "sprite_art.py",
-                     "art_layout.py", "character_art.py", "font_art.py", "npc_art.py", "render_graphics.py",
-                     "known_graphics.py", "rom_stats.py"):
-            shutil.copy2(ROOT / "bin" / name, self.root / "bin" / name)
+        copy_tool_tree(self.root)
         self.rom = bytes(range(256)) * 0x200
         (self.root / "input" / ROM_NAME).write_bytes(self.rom)
         self.working = self.root / "working" / WORKING_NAME
         self.hacks_log = self.root / "working" / "hacks.txt"
 
     def build_sprite_rom(self):
-        rom = bytearray(0x20000)
+        rom = blank_rom()
         for hero, pit, size, hero_marker, pit_marker in HERO_PIT_SEGMENTS:
             rom[hero:hero + size] = bytes([hero_marker]) * size
             rom[pit:pit + size] = bytes([pit_marker]) * size
@@ -747,9 +741,7 @@ class HackWrapperTests(unittest.TestCase):
         self.assertEqual(self.hacks_log.read_text(), "")
 
     def test_dump_stats_writes_aligned_arrays_without_logging(self):
-        rom = bytearray(0x20000)
-        rom[0x134:0x143] = b"ROLAN'S CURSE 2"
-        rom[0x147:0x149] = b"\x06\x02"
+        rom = blank_rom(header=True)
         rom[0x17065] = 7
         self.use_input_rom(bytes(rom))
         self.run_wrapper("reset")

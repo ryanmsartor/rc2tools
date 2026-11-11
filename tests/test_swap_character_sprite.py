@@ -1,22 +1,13 @@
-import importlib.util
-import sys
 import unittest
-from pathlib import Path
 
+from tests.support import blank_rom, load_bin_module
 
-ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT / "bin"))
-SPEC = importlib.util.spec_from_file_location(
-    "swap_character_sprite",
-    ROOT / "bin" / "swap_character_sprite.py",
-)
-swap_character_sprite = importlib.util.module_from_spec(SPEC)
-SPEC.loader.exec_module(swap_character_sprite)
+swap_character_sprite = load_bin_module("swap_character_sprite")
 
 
 class SwapCharacterSpriteTests(unittest.TestCase):
     def test_swaps_sprite_regions_and_pow_portrait_in_place(self):
-        rom = bytearray(0x20000)
+        rom = blank_rom()
         first = swap_character_sprite.CHARACTER_SPRITES["hero"]
         second = swap_character_sprite.CHARACTER_SPRITES["pit"]
         segments = (
@@ -58,7 +49,7 @@ class SwapCharacterSpriteTests(unittest.TestCase):
             with self.subTest(characters=(character1, character2)):
                 with self.assertRaises(ValueError):
                     swap_character_sprite.swap_character_sprites(
-                        bytearray(0x20000),
+                        blank_rom(),
                         character1,
                         character2,
                     )

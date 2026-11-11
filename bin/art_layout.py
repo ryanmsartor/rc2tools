@@ -15,11 +15,11 @@ from typing import Dict, List, Tuple
 
 from PIL import Image
 
+from rom_io import BANK_SIZE
+from tiles import TILE_BYTES, TILE_WIDTH, decode_tile, encode_tile
 
-TILE_SIZE = 8
-TILE_BYTES = 16
+
 RECORD_SIZE = 6
-BANK_SIZE = 0x4000
 BANK_6_OFFSET = 0x18000
 VRAM_BASE = 0x8000
 VRAM_WINDOW = 0x2000
@@ -57,7 +57,7 @@ class ArtLayout:
 
     @property
     def image_size(self) -> Tuple[int, int]:
-        return (self.columns * TILE_SIZE, self.image_rows * TILE_SIZE)
+        return (self.columns * TILE_WIDTH, self.image_rows * TILE_WIDTH)
 
     def in_place_ids(self) -> List[int]:
         return [tile_id for first, last, _ in self.in_place_blocks for tile_id in range(first, last + 1)]
@@ -117,21 +117,7 @@ def _read_u16(rom: bytes, offset: int) -> int:
     return rom[offset] | rom[offset + 1] << 8
 
 
-def _decode_tile(rom: bytes, offset: int) -> list:
-    rows = []
-    for y in range(TILE_SIZE):
-        low, high = rom[offset + 2 * y], rom[offset + 2 * y + 1]
-        rows.append([((high >> (7 - x)) & 1) << 1 | ((low >> (7 - x)) & 1) for x in range(TILE_SIZE)])
-    return rows
 
-
-def _encode_tile(rows: list) -> bytes:
-    data = bytearray()
-    for row in rows:
-        low = sum((index & 1) << (7 - x) for x, index in enumerate(row))
-        high = sum(((index >> 1) & 1) << (7 - x) for x, index in enumerate(row))
-        data.extend((low, high))
-    return bytes(data)
 
 
 def _load_vram(layout: ArtLayout, rom: bytes) -> bytearray:
@@ -154,10 +140,10 @@ def render_art(layout: ArtLayout, rom: bytes) -> Image.Image:
         row = layout.margin_top + image_row
         for col in range(layout.columns):
             tile_id = rom[layout.tilemap_offset + row * layout.columns + col]
-            pixels = _decode_tile(vram, _tile_vram(tile_id) - VRAM_BASE)
+            pixels = decode_tile(vram, _tile_vram(tile_id) - VRAM_BASE)
             for y, indices in enumerate(pixels):
                 for x, index in enumerate(indices):
-                    image.putpixel((col * TILE_SIZE + x, image_row * TILE_SIZE + y), layout.shades[index])
+                    image.putpixel((col * TILE_WIDTH + x, image_row * TILE_WIDTH + y), layout.shades[index])
     return image
 
 
@@ -197,9 +183,9 @@ def apply_art(layout: ArtLayout, rom: bytearray, image: Image.Image) -> int:
     for image_row in range(layout.image_rows):
         for col in range(layout.columns):
             pattern = tuple(
-                lut[gray.getpixel((col * TILE_SIZE + x, image_row * TILE_SIZE + y))]
-                for y in range(TILE_SIZE)
-                for x in range(TILE_SIZE)
+                lut[gray.getpixel((col * TILE_WIDTH + x, image_row * TILE_WIDTH + y))]
+                for y in range(TILE_WIDTH)
+                for x in range(TILE_WIDTH)
             )
             index = pattern_index.get(pattern)
             if index is None:
@@ -221,7 +207,7 @@ def apply_art(layout: ArtLayout, rom: bytearray, image: Image.Image) -> int:
     records = list(layout.stock_copies)
     tile_ids: List[int] = []
     for index, pattern in enumerate(patterns):
-        data = _encode_tile([list(pattern[y * TILE_SIZE:(y + 1) * TILE_SIZE]) for y in range(TILE_SIZE)])
+        data = encode_tile([list(pattern[y * TILE_WIDTH:(y + 1) * TILE_WIDTH]) for y in range(TILE_WIDTH)])
         if index < len(in_ids):
             tile_id = in_ids[index]
             writes.append((layout.in_place_offset(tile_id), data))

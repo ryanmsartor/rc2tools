@@ -6,11 +6,11 @@ import sys
 from pathlib import Path
 
 from rom_annotations import ROM_ANNOTATIONS
+from rom_io import BANK_SIZE, parse_offset
 from sprite_annotations import SPRITE_BLOCKS
 
 ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_ROM = ROOT / "input" / "Rolan's Curse II (USA).gb"
-BANK_SIZE = 0x4000
 
 REGISTERS = ("B", "C", "D", "E", "H", "L", "[HL]", "A")
 STACK_REGISTERS = ("BC", "DE", "HL", "AF")
@@ -197,13 +197,6 @@ def disassemble(rom: bytes, start: int = 0, end: int | None = None) -> str:
             lines.append(f"    {instruction}")
             cursor += size
     return "\n".join(lines) + "\n"
-
-
-def parse_offset(value: str) -> int:
-    try:
-        return int(value, 0)
-    except ValueError as error:
-        raise argparse.ArgumentTypeError(f"invalid offset: {value}") from error
 
 
 def main(argv: list[str] | None = None) -> int:

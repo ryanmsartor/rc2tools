@@ -1,16 +1,8 @@
-import importlib.util
-import sys
 import unittest
-from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT / "bin"))
-try:
-    SPEC = importlib.util.spec_from_file_location("recompile_rom", ROOT / "bin" / "recompile_rom.py")
-    recompile_rom = importlib.util.module_from_spec(SPEC)
-    SPEC.loader.exec_module(recompile_rom)
-finally:
-    sys.path.pop(0)
+from tests.support import load_bin_module
+
+recompile_rom = load_bin_module("recompile_rom")
 
 
 class RecompileRomTests(unittest.TestCase):

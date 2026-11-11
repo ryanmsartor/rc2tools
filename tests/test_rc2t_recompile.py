@@ -1,20 +1,13 @@
-import importlib.util
 import os
 import shutil
 import subprocess
-import sys
 import tempfile
 import unittest
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT / "bin"))
-try:
-    SPEC = importlib.util.spec_from_file_location("decompile_rom", ROOT / "bin" / "decompile_rom.py")
-    decompile_rom = importlib.util.module_from_spec(SPEC)
-    SPEC.loader.exec_module(decompile_rom)
-finally:
-    sys.path.pop(0)
+from tests.support import ROOT, copy_tool_tree, load_bin_module
+
+decompile_rom = load_bin_module("decompile_rom")
 
 
 class RecompileWrapperTests(unittest.TestCase):
@@ -22,12 +15,8 @@ class RecompileWrapperTests(unittest.TestCase):
         self.temporary = tempfile.TemporaryDirectory()
         self.addCleanup(self.temporary.cleanup)
         self.root = Path(self.temporary.name)
-        (self.root / "bin").mkdir()
         (self.root / "input").mkdir()
-        shutil.copy2(ROOT / "rc2t", self.root / "rc2t")
-        for name in ("decompile_rom.py", "recompile_rom.py", "sprite_annotations.py",
-                     "rom_annotations.py", "dump_text.py", "render_text.py", "known_graphics.py", "rom_stats.py"):
-            shutil.copy2(ROOT / "bin" / name, self.root / "bin" / name)
+        copy_tool_tree(self.root)
 
     def run_wrapper(self, command, *args, env=None):
         return subprocess.run(

@@ -1,14 +1,8 @@
-import importlib.util
-import sys
 import unittest
-from pathlib import Path
 
+from tests.support import load_bin_module
 
-ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT / "bin"))
-SPEC = importlib.util.spec_from_file_location("hack_rom", ROOT / "bin" / "hack_rom.py")
-hack_rom = importlib.util.module_from_spec(SPEC)
-SPEC.loader.exec_module(hack_rom)
+hack_rom = load_bin_module("hack_rom")
 
 
 def apply_ips(original, patch):

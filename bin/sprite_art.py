@@ -4,15 +4,12 @@ from typing import NamedTuple, Optional
 
 from PIL import Image
 
-from art_layout import _encode_tile
 from render_graphics import (
     HACK_ART_PALETTE,
     SPRITE_TILE_POSITIONS,
-    TILE_BYTES,
-    TILE_WIDTH,
-    decode_tiles,
     render_sprites,
 )
+from tiles import TILE_BYTES, TILE_WIDTH, decode_tiles, encode_tile
 
 
 SPRITE_BYTES = 64
@@ -73,7 +70,7 @@ def apply_sprite_art(rom: bytearray, gray: Image.Image, offset: int, x: int, y: 
             for py in range(TILE_WIDTH)
         ]
         start = offset + tile * TILE_BYTES
-        rom[start:start + TILE_BYTES] = _encode_tile(rows)
+        rom[start:start + TILE_BYTES] = encode_tile(rows)
 
 
 class Piece(NamedTuple):
@@ -134,5 +131,5 @@ def apply_piece(rom: bytearray, gray: Image.Image, piece: Piece, x: int, y: int)
             for py in range(TILE_WIDTH)
         ]
         start = piece.offset + index * TILE_BYTES
-        rom[start:start + TILE_BYTES] = _encode_tile(rows)
+        rom[start:start + TILE_BYTES] = encode_tile(rows)
 

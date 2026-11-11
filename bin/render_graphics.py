@@ -8,18 +8,16 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
 
-from rom_stats import read_rom
+from rom_io import BANK_SIZE, parse_offset, read_rom
 from known_graphics import KNOWN_GRAPHICS_RANGES
+from tiles import TILE_BYTES, TILE_WIDTH, decode_tiles
 
-TILE_BYTES = 16
-TILE_WIDTH = 8
 SPRITE_TILE_POSITIONS = ((0, 0), (0, 1), (1, 0), (1, 1))
 SPRITE_WIDTH = TILE_WIDTH * 2
 SPRITE_GUTTER = 1
 GUTTER_COLOR = (192, 192, 192)
 # Cells without ROM bytes use lilac so they are not mistaken for all-white data.
 EMPTY_COLOR = (200, 162, 200)
-ROM_BANK_BYTES = 0x4000
 BANK_LABEL_PADDING = 4
 BANK_DIVIDER_PADDING = 8
 BANK_DIVIDER_THICKNESS = 2
@@ -242,14 +240,6 @@ HACK_ART_PALETTE = (
 )
 
 
-def parse_offset(value: str) -> int:
-    """Parse an offset written in decimal or with a 0x prefix."""
-    try:
-        return int(value, 0)
-    except ValueError as error:
-        raise argparse.ArgumentTypeError(f"invalid offset: {value}") from error
-
-
 def parse_tile_grid(value: str) -> tuple[int, int]:
     """Parse tile grid dimensions written as WIDTHxHEIGHT."""
     parts = value.lower().split("x")
@@ -259,25 +249,6 @@ def parse_tile_grid(value: str) -> tuple[int, int]:
     if width < 1 or height < 1:
         raise argparse.ArgumentTypeError("tile grid dimensions must be at least 1")
     return width, height
-
-
-def decode_tiles(data: bytes) -> list[list[int]]:
-    """Decode Game Boy 2bpp tiles, allowing a final tile to end at any byte."""
-    if not data:
-        raise ValueError("range must contain at least one byte")
-
-    pixels = []
-    for tile_start in range(0, len(data), TILE_BYTES):
-        tile_data = data[tile_start:tile_start + TILE_BYTES].ljust(TILE_BYTES, b"\x00")
-        tile = []
-        for row in range(TILE_WIDTH):
-            low, high = tile_data[row * 2:row * 2 + 2]
-            tile.append([
-                ((low >> bit) & 1) | (((high >> bit) & 1) << 1)
-                for bit in range(7, -1, -1)
-            ])
-        pixels.append(tile)
-    return pixels
 
 
 def add_address_axes(
@@ -626,8 +597,8 @@ def render_banked_sprites(
     address = start_address
     end_address = start_address + len(data)
     while address < end_address:
-        bank = address // ROM_BANK_BYTES
-        block_end = min(end_address, (bank + 1) * ROM_BANK_BYTES)
+        bank = address // BANK_SIZE
+        block_end = min(end_address, (bank + 1) * BANK_SIZE)
         block = render_sprites(
             data[address - start_address:block_end - start_address],
             columns,

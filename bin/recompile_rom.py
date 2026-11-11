@@ -8,7 +8,8 @@ import sys
 import tempfile
 from pathlib import Path
 
-from decompile_rom import BANK_SIZE, DEFAULT_ROM, ILLEGAL_OPCODES, decode_instruction
+from decompile_rom import DEFAULT_ROM, ILLEGAL_OPCODES, decode_instruction
+from rom_io import BANK_SIZE
 
 ROOT = Path(__file__).resolve().parent.parent
 MAX_BANKS = 512

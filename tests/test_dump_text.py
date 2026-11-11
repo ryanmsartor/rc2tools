@@ -1,26 +1,16 @@
-import importlib.util
-import shutil
 import subprocess
-import sys
 import tempfile
 import unittest
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT / "bin"))
-try:
-    SPEC = importlib.util.spec_from_file_location("dump_text", ROOT / "bin" / "dump_text.py")
-    dump_text = importlib.util.module_from_spec(SPEC)
-    SPEC.loader.exec_module(dump_text)
-finally:
-    sys.path.pop(0)
+from tests.support import blank_rom, copy_tool_tree, load_bin_module
+
+dump_text = load_bin_module("dump_text")
 
 
 class DumpTextTests(unittest.TestCase):
     def setUp(self):
-        self.rom = bytearray(0x20000)
-        self.rom[0x134:0x143] = b"ROLAN'S CURSE 2"
-        self.rom[0x147:0x149] = b"\x06\x02"
+        self.rom = blank_rom(header=True)
 
     def test_exact_format_ranges_overlaps_and_placeholders(self):
         self.rom[0x1BABA:0x1BACC] = bytes([0x0A, 0xFD, 0xFE, 0x01] + [0xB2] * 14)
@@ -133,11 +123,8 @@ class DumpTextTests(unittest.TestCase):
     def test_wrapper_defaults_explicit_paths_and_failure(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            (root / "bin").mkdir()
             (root / "input").mkdir()
-            shutil.copy2(ROOT / "rc2t", root / "rc2t")
-            for name in ("dump_text.py", "render_text.py", "known_graphics.py", "rom_stats.py"):
-                shutil.copy2(ROOT / "bin" / name, root / "bin" / name)
+            copy_tool_tree(root)
             rom = root / "input" / "Rolan's Curse II (USA).gb"
             rom.write_bytes(self.rom)
             result = subprocess.run(

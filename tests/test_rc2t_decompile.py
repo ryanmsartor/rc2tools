@@ -1,10 +1,9 @@
-import shutil
 import subprocess
 import tempfile
 import unittest
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent
+from tests.support import copy_tool_tree
 
 
 class DecompileWrapperTests(unittest.TestCase):
@@ -12,11 +11,7 @@ class DecompileWrapperTests(unittest.TestCase):
         self.temporary = tempfile.TemporaryDirectory()
         self.addCleanup(self.temporary.cleanup)
         self.root = Path(self.temporary.name)
-        (self.root / "bin").mkdir()
-        shutil.copy2(ROOT / "rc2t", self.root / "rc2t")
-        for name in ("decompile_rom.py", "sprite_annotations.py", "rom_annotations.py",
-                     "dump_text.py", "render_text.py", "known_graphics.py", "rom_stats.py"):
-            shutil.copy2(ROOT / "bin" / name, self.root / "bin" / name)
+        copy_tool_tree(self.root)
         rom = self.root / "game.gb"
         rom.write_bytes(bytes([0x00, 0x18, 0xFD]))
         self.rom = rom

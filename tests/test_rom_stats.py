@@ -1,26 +1,8 @@
-import importlib.util
-import tempfile
 import unittest
-from pathlib import Path
 
+from tests.support import load_bin_module
 
-ROOT = Path(__file__).resolve().parent.parent
-SPEC = importlib.util.spec_from_file_location("rom_stats", ROOT / "bin" / "rom_stats.py")
-rom_stats = importlib.util.module_from_spec(SPEC)
-SPEC.loader.exec_module(rom_stats)
-
-
-def hex_dump(data, powershell=False):
-    rows = []
-    for offset in range(0, len(data), 16):
-        chunk = data[offset:offset + 16]
-        if powershell:
-            rows.append(f"{offset:08X}   {chunk.hex(' ').upper()}  ................")
-        else:
-            groups = " ".join(chunk[i:i + 2].hex() for i in range(0, 16, 2))
-            rows.append(f"{offset:08x}: {groups}  ................")
-    text = "\n".join(rows) + "\n"
-    return text.encode("utf-16" if powershell else "utf-8")
+rom_stats = load_bin_module("rom_stats")
 
 
 class RomStatsTests(unittest.TestCase):
@@ -28,17 +10,6 @@ class RomStatsTests(unittest.TestCase):
         self.rom = bytearray((i * 37 + i // 256) % 256 for i in range(0x20000))
         self.rom[0x134:0x143] = b"ROLAN'S CURSE 2"
         self.rom[0x147:0x149] = b"\x06\x02"
-
-    def test_hex_dump_formats_and_invalid_rows(self):
-        for powershell in (False, True):
-            with self.subTest(powershell=powershell):
-                self.assertEqual(rom_stats.parse_hex_dump(hex_dump(self.rom, powershell)), self.rom)
-        with self.assertRaisesRegex(ValueError, "expected offset"):
-            rom_stats.parse_hex_dump(b"00000010: 0000 0000 0000 0000 0000 0000 0000 0000  ................\n")
-        with self.assertRaisesRegex(ValueError, "invalid hex dump row"):
-            rom_stats.parse_hex_dump(b"00000000: 0000 broken\n")
-        with self.assertRaisesRegex(ValueError, "no recognizable rows"):
-            rom_stats.parse_hex_dump(b"not a dump\n")
 
     def test_read_stats_names_and_offsets(self):
         stats = dict(rom_stats.read_stats(self.rom))
@@ -108,17 +79,6 @@ class RomStatsTests(unittest.TestCase):
         for line in lines:
             with self.subTest(line=line):
                 self.assertEqual(line.count(", "), 15)
-
-    def test_read_rom_rejects_truncated_or_wrong_rom(self):
-        with tempfile.TemporaryDirectory() as directory:
-            path = Path(directory) / "game.gb"
-            path.write_bytes(self.rom[:-1])
-            with self.assertRaisesRegex(ValueError, "expected a 131072-byte ROM"):
-                rom_stats.read_rom(path)
-            self.rom[0x134] = 0
-            path.write_bytes(self.rom)
-            with self.assertRaisesRegex(ValueError, "ROM header does not match"):
-                rom_stats.read_rom(path)
 
 
 if __name__ == "__main__":
