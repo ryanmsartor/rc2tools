@@ -9,6 +9,7 @@ from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 
 from extract_json import read_rom
+from known_graphics import KNOWN_GRAPHICS_RANGES
 
 TILE_BYTES = 16
 TILE_WIDTH = 8
@@ -63,26 +64,32 @@ PORTRAIT_TILE_COLUMNS = 4
 PORTRAIT_TILE_COUNT = PORTRAIT_TILE_COLUMNS ** 2
 PORTRAIT_BYTES = PORTRAIT_TILE_COUNT * TILE_BYTES
 PORTRAIT_WIDTH = PORTRAIT_TILE_COLUMNS * TILE_WIDTH
-# Keep these exclusive physical-ROM ranges aligned with the graphics in docs/rom-map.md.
-KNOWN_GRAPHICS_RANGES = (
-    (0x5291, 0x5580),
-    (0x804E, 0x900E),
-    (0x9106, 0xBC86),
-    (0xC46A, 0xE25A),
-    (0xE25A, 0xFD5A),
-    (0xFD5A, 0xFD7A),
-    (0x1811E, 0x1861E),
-    (0x1861E, 0x18A1E),
-    (0x18A1E, 0x1A6AE),
-    (0x17185, 0x17725),
-    (0x1A6AE, 0x1B0FE),
-)
 # Exclusive physical-ROM ranges documented in docs/known-text.md, shaded in yellow.
 KNOWN_TEXT_RANGES = (
     (0x00134, 0x00144),
+    (0x040A2, 0x040AC),
+    (0x040B0, 0x040BC),
+    (0x040CC, 0x040D6),
+    (0x040DA, 0x040E6),
+    (0x040F6, 0x04100),
+    (0x04104, 0x04110),
+    (0x04120, 0x0412A),
+    (0x0412E, 0x0413A),
+    (0x041AF, 0x041B3),
+    (0x041BB, 0x041BF),
+    (0x041C1, 0x041C5),
+    (0x041C7, 0x041CB),
+    (0x043C3, 0x043FB),
+    (0x0471B, 0x04721),
+    (0x04722, 0x04727),
+    (0x04728, 0x0472E),
+    (0x0472F, 0x04736),
     (0x04736, 0x04823),
     (0x04998, 0x049A9),
+    (0x049A7, 0x049AB),
+    (0x049AB, 0x049B7),
     (0x04A7C, 0x04AC9),
+    (0x04C77, 0x04C81),
     (0x050CB, 0x050E7),
     (0x05109, 0x0511B),
     (0x058EB, 0x0590F),

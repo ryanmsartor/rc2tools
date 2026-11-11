@@ -121,7 +121,7 @@ A sequence of 23 consecutive 16×16 sprites beginning at physical ROM offset `0x
 | # | Character | Icon | Physical ROM start |
 |---:|---|---|---:|
 | 1 | Hero | Sword | `0x804E` |
-| 2 | Hero | Magic ball | `0x808E` |
+| 2 | Hero | Magic Ball | `0x808E` |
 | 3 | Pit | Dagger | `0x80CE` |
 | 4 | Pit | Boomerang | `0x810E` |
 | 5 | Pit | Bomb | `0x814E` |
@@ -139,7 +139,7 @@ A sequence of 23 consecutive 16×16 sprites beginning at physical ROM offset `0x
 | 17 | Lee | Firecracker | `0x844E` |
 | 18 | Lora | Bow | `0x848E` |
 | 19 | Lora | Heal | `0x84CE` |
-| 20 | Lora | Wings | `0x850E` |
+| 20 | Lora | Fairy Wings | `0x850E` |
 | 21 | Zold | Sword | `0x854E` |
 | 22 | Zold | Wave | `0x858E` |
 | 23 | Zold | Magic | `0x85CE` |
@@ -494,16 +494,18 @@ The eight tiles from `0xB806` through `0xB885` continue the single-tile UI graph
 
 This ends the documented run of single-tile graphics at `0xB886`; larger sprite graphics follow.
 
-### Stockable item sprites
+### Stockable inventory item sprites
 
-Four stockable items follow at `0xB886`. Each sprite is 2×2 tiles (64 bytes), and the four sprites are stored consecutively:
+Four stockable items follow at `0xB886`. Their names are documented in the
+text table above. Each sprite is 2×2 tiles (64 bytes), and the four sprites
+are stored consecutively:
 
 | Physical ROM range | Contents |
 |---|---|
-| `0xB886-0xB8C5` | Large potion |
-| `0xB8C6-0xB905` | Teardrop |
-| `0xB906-0xB945` | Crystal ball |
-| `0xB946-0xB985` | Angel's wing |
+| `0xB886-0xB8C5` | Large Potions |
+| `0xB8C6-0xB905` | Fairy's Tears |
+| `0xB906-0xB945` | Magic Ball |
+| `0xB946-0xB985` | Fairy Wings |
 
 Together these occupy `0xB886-0xB985` inclusive and exactly match the separately listed descriptor source range `0xB886-0xB985` below.
 

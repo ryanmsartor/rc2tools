@@ -15,7 +15,7 @@ The supplied `save_castlep2_pitlv7.hex` is a UTF-16 hex dump with 32 contiguous 
 | Save offset | Dump bytes | Interpretation from notes |
 |---|---|---|
 | `0x024` | `F5` | Chest flags with low-nibble bits `1` and `4` set. |
-| `0x064` | `F9` | Potion count: low nibble `9`. |
+| `0x064` | `F9` | Large Potions count: low nibble `9`. |
 | `0x072` | `F1` | Controlled character: low nibble `1` (Pit). |
 | `0x088` | `F6` | Pit level minus 1: low nibble `6` (level 7). |
 | `0x0B0-0x0B7` | `FB F1 F2 F2 FE FF FE FF` | `RY__` using the notes' name table. |
@@ -46,9 +46,9 @@ Every byte in this example from `0x000` through `0x0B7` has an upper nibble of `
 
 | Original label | Save offset | Observation |
 |---|---|---|
-| `6004` | `0x064` | Potion count. |
-| `6006` | `0x066` | Magic ball count. |
-| `6007` | `0x067` | Wing count. |
+| `6004` | `0x064` | Large Potions count. |
+| `6006` | `0x066` | Magic Ball count. |
+| `6007` | `0x067` | Fairy Wings count. |
 | `6008` | `0x068` | Warp town: `0` start, `1` Cadal (Pit), `2` Baroa (Lane). |
 | `600A` | `0x06A` | Character Y position on screen, in whole 8-pixel sprites. |
 | `600B` | `0x06B` | Possibly area: `0` first town, `1` first field. |

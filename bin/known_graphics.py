@@ -1,0 +1,16 @@
+"""Documented exclusive physical-ROM ranges containing graphics."""
+
+# Keep these ranges aligned with the graphics in docs/rom-map.md.
+KNOWN_GRAPHICS_RANGES = (
+    (0x5291, 0x5580),
+    (0x804E, 0x900E),
+    (0x9106, 0xBC86),
+    (0xC46A, 0xE25A),
+    (0xE25A, 0xFD5A),
+    (0xFD5A, 0xFD7A),
+    (0x1811E, 0x1861E),
+    (0x1861E, 0x18A1E),
+    (0x18A1E, 0x1A6AE),
+    (0x17185, 0x17725),
+    (0x1A6AE, 0x1B0FE),
+)

@@ -22,6 +22,7 @@ the game's text routine.
 | `0x0A-0x23` | `a`-`z` (`0x0A` = `a`) |
 | `0xB2` | Space |
 | `0x24` | Apostrophe |
+| `0x26` | `-` (dash), inferred from `boomer-ang` and mapped at the user's request |
 | `0x27` | Period, confirmed by the alphabet tables at `0x17D4E` and `0x1BD4E` |
 | `0x28` | Probably a comma; interpretation remains tentative, although the alphabet tables support it |
 | `0x29` | `?`, confirmed by the alphabet tables |
@@ -29,7 +30,7 @@ the game's text routine.
 | `0x2B` | `-` (hyphen), confirmed by the user and the alphabet tables |
 | `0x2D` | `:`, confirmed by speaker labels |
 | `0xFD` | Line break, confirmed by the user from the game's display; rendered as `+` |
-| `0xFE` | Probable second line break, unconfirmed; rendered as `▎` |
+| `0xFE` | Space, identified by the user from `chr change` at `0x04C77-0x04C81` |
 | `0xFF` | End of a text segment; rendered as `#` |
 | `0xE0-0xE3` | Hero name placeholder, rendered as `HERO` |
 | Other bytes (`0xDF`, `0xE4`, `0xE5`, `0xEB`, `0xEC`, `0xEE`, `0x7D`, `0x84`, `0xBF`, `0x04`, and others) | Control codes; not resolved |
@@ -47,8 +48,11 @@ routine, and the byte meanings are unconfirmed.
 `./rc2t render-text` decodes every ROM byte with this table into one
 continuous string in `output/rom-text.txt`. `./rc2t dump-text` instead
 outputs the selected ranges, one per line with padded start and exclusive end
-offsets. Both render unknown bytes as distinct placeholders indexed by byte
-value; the title range in `dump-text` uses ASCII for printable bytes.
+offsets. By default, both render unknown bytes as distinct placeholders indexed
+by byte value; the title range in `dump-text` uses ASCII for printable bytes.
+For `render-text`, `--known-only` replaces unknown bytes with `_`, and
+`--omit-sprites` replaces bytes in the known graphics ranges with `%`. Both
+options can be combined with `--wrap`.
 Placeholder symbols avoid the 1bpp font's characters and known glyphs. The
 pool and exact mapping are defined in [render_text.py](../bin/render_text.py).
 
@@ -70,20 +74,51 @@ inside longer strings, and the dump retains those overlapping fragments.
 - `0x1E257-0x1E26F`, `0x1E26F-0x1E295`, and `0x1E295-0x1E2AB`
   correspond to dog, chicken, and frog NPCs, respectively.
 - The candidate at `0x1BABA-0x1BACC` is unterminated. Its `0xFE` bytes
-  render as `▎`; the trailing `0x01` renders as `%` and may be a period.
+  render as spaces; the trailing `0x01` renders as `%` and may be a period.
   The preceding `0x20` (rendered as `w`) is excluded.
 
-## Name lists, party fragments, and alphabet tables
+## Menu labels, name lists, party fragments, and alphabet tables
 
 These are text-table data rather than sentences. The dump displays the raw
 decoded bytes, including placeholders for unidentified separators and
 selection bytes.
 
+The eight item-name fragments below form the names of four inventoried items,
+split into two words each: **Large Potions**, **Fairy's Tears**, **Magic Ball**,
+and **Fairy Wings**. The ranges include surrounding `0xFE` spaces but exclude
+adjacent non-space control bytes. For adjacent fragments, space ownership
+follows the user's choices; see the ranges for exact boundaries.
+
 | Physical ROM range | Contents and observations |
 |---|---|
-| `0x4736-0x4823` | Ability and weapon names; ends with `0xD9`. Bytes `0x25`, `0x26`, and `0xD9` are unidentified. |
-| `0x4998-0x49A9` | Range names; the leading `0x20` (rendered as `w`) is unverified. |
-| `0x4A7C-0x4AC9` | Character and class names; ends with `0x9D`. |
+| `0x040A2-0x040AC` | `large`, with surrounding spaces. |
+| `0x040B0-0x040BC` | `potions`, with surrounding spaces. |
+| `0x040CC-0x040D6` | `fairy's`, with surrounding spaces. |
+| `0x040DA-0x040E6` | `tears`, with surrounding spaces. |
+| `0x040F6-0x04100` | `magic`, with surrounding spaces. |
+| `0x04104-0x04110` | `ball`, with surrounding spaces. |
+| `0x04120-0x0412A` | `fairy`, with surrounding spaces. |
+| `0x0412E-0x0413A` | `wings`, with surrounding spaces. |
+| `0x041AF-0x041B3` | Pause-menu `itm`: select items. |
+| `0x041BB-0x041BF` | Pause-menu `pow`: view character power levels. |
+| `0x041C1-0x041C5` | Pause-menu `map`: view the map. |
+| `0x041C7-0x041CB` | Pause-menu `sav`: save the game. |
+| `0x043C3-0x043CA` | Character name `pit`. |
+| `0x043CA-0x043D3` | Character name `lane`. |
+| `0x043D3-0x043DB` | Character name `kyle`. |
+| `0x043DB-0x043E3` | Character name `jude`. |
+| `0x043E3-0x043EA` | Character name `lee`. |
+| `0x043EA-0x043F3` | Character name `lora`. |
+| `0x043F3-0x043FB` | Character name `zold`. |
+| `0x4736-0x4823` | Ability and weapon name table; ends with `0xD9`. Individual fragments are listed below. Bytes `0x25` and `0xD9` are unidentified. |
+| `0x4998-0x49A9` | Earlier partial range-name table; the leading `0x20` (rendered as `w`) is unverified, and the range ends inside `wide`. Individual complete labels follow. |
+| `0x04999-0x0499F` | Range label `narrow`. |
+| `0x0499F-0x049A5` | Range label `middle`. |
+| `0x049A5-0x049AB` | Range label `wide`. |
+| `0x049AB-0x049B1` | Range label `short`. |
+| `0x049B1-0x049B7` | Range label `long`. |
+| `0x4A7C-0x4AC9` | Character and class names; ends with `0x9D`. Individual names and classes are listed below. |
+| `0x04C77-0x04C81` | Character change label `chr change`; `0xFE` is the space. |
 | `0x050CB-0x050E7` | Alphabet table. |
 | `0x05109-0x0511B` | Alphabet table. |
 | `0x058EB-0x0590F` | Alphabet table with repeated letters. |
@@ -94,6 +129,72 @@ selection bytes.
 | `0x1B9AA-0x1B9C7` | Party-message fragments separated by `0xFE` and an unmapped byte; ends with `0x04`. |
 | `0x1BD4E-0x1BD6F` | Same as `0x17D4E-0x17D6F`. |
 | `0x1BD70-0x1BD80` | Same as `0x17D70-0x17D80`. |
+
+### Character and class fragments
+
+These are individual text ranges within the existing `0x04A7C-0x04AC9`
+table range; some fragments are adjacent without separators.
+
+| Physical ROM range | Fragment |
+|---|---|
+| `0x04A7D-0x04A83` | `knight` |
+| `0x04A83-0x04A87` | `pit` |
+| `0x04A87-0x04A8A` | `elf` |
+| `0x04A8A-0x04A8E` | `lane` |
+| `0x04A8E-0x04A94` | `cleric` |
+| `0x04A94-0x04A98` | `kyle` |
+| `0x04A98-0x04A9E` | `zombie` |
+| `0x04A9E-0x04AA2` | `jude` |
+| `0x04AA2-0x04AA8` | `wizard` |
+| `0x04AA8-0x04AAC` | `lee` |
+| `0x04AAC-0x04AB2` | `kungfu` |
+| `0x04AB2-0x04AB6` | `lora` |
+| `0x04AB6-0x04ABB` | `cupid` |
+| `0x04ABB-0x04ABF` | `zold` |
+| `0x04ABF-0x04AC5` | `master` |
+
+### Ability, weapon, and stat label fragments
+
+These fragments have individual dump ranges; the existing broader table range
+is also retained. Some labels are adjacent without separators. The dash in
+`boomer-ang` is byte `0x26`, distinct from the `0x2B` hyphen.
+
+| Physical ROM range | Fragment |
+|---|---|
+| `0x0471B-0x04721` | `damage` |
+| `0x04722-0x04727` | `range` |
+| `0x04728-0x0472E` | `range` |
+| `0x0472F-0x04736` | `effect` |
+| `0x04737-0x04740` | `pathmaker` |
+| `0x04740-0x0474A` | `halfshield` |
+| `0x0474A-0x04750` | `revive` |
+| `0x04751-0x04759` | `nodamage` |
+| `0x04759-0x04761` | `teleport` |
+| `0x04761-0x04764` | `arc` |
+| `0x04764-0x04769` | `sword` |
+| `0x04769-0x04770` | `sabre` |
+| `0x04770-0x0477C` | `electricball` |
+| `0x0477C-0x04783` | `dagger` |
+| `0x04783-0x0478D` | `boomer-ang` |
+| `0x0478D-0x04794` | `bomb` |
+| `0x04794-0x0479B` | `staff` |
+| `0x0479B-0x047A1` | `shield` |
+| `0x047A1-0x047A7` | `heal` |
+| `0x047A7-0x047B0` | `bone` |
+| `0x047B0-0x047B8` | `playdead` |
+| `0x047B8-0x047BF` | `thunder` |
+| `0x047BF-0x047C7` | `fireball` |
+| `0x047C7-0x047D0` | `smashball` |
+| `0x047D0-0x047D6` | `quake` |
+| `0x047D6-0x047DE` | `sai` |
+| `0x047DE-0x047E7` | `rapidfire` |
+| `0x047E7-0x047EF` | `firework` |
+| `0x047EF-0x047F5` | `arrow` |
+| `0x047F5-0x047FB` | `heal` |
+| `0x047FB-0x04804` | `wings` |
+| `0x04804-0x0480D` | `darkblade` |
+| `0x0480D-0x04819` | `specialblade` |
+| `0x04819-0x04821` | `megaball` |
 
 ## Unclassified control-byte runs
 

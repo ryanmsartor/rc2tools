@@ -1,18 +1,24 @@
 #!/usr/bin/env python3
 """Decode an entire ROM into one long string using the documented character table."""
 
+import argparse
 import sys
+from collections.abc import Iterator
 from pathlib import Path
+
+from known_graphics import KNOWN_GRAPHICS_RANGES
 
 ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_ROM = ROOT / "input" / "Rolan's Curse II (USA).gb"
 DEFAULT_OUTPUT = ROOT / "output" / "rom-text.txt"
+WRAP_WIDTH = 64
 
 # Mirrors docs/known-text.md. Lowercase letters are used for known letters.
 CHARACTER_TABLE = {
     **{0x0A + index: chr(ord("a") + index) for index in range(26)},
     0xB2: " ",
     0x24: "'",
+    0x26: "-",
     0x27: ".",
     0x28: ",",
     0x29: "?",
@@ -26,6 +32,7 @@ CHARACTER_TABLE = {
     0xE1: "E",
     0xE2: "R",
     0xE3: "O",
+    0xFE: " ",
 }
 # Unknown bytes each get their own placeholder, indexed by byte value so a byte keeps
 # the same symbol if it is mapped later. Symbols avoid the 1bpp font's characters
@@ -43,19 +50,72 @@ def glyph_for(byte: int) -> str:
     return CHARACTER_TABLE.get(byte, UNKNOWN_GLYPHS[byte])
 
 
-def decode(data: bytes) -> str:
-    return "".join(glyph_for(byte) for byte in data)
+def render_glyphs(
+    data: bytes, known_only: bool = False, omit_sprites: bool = False
+) -> Iterator[str]:
+    graphics_mask = bytearray(len(data))
+    if omit_sprites:
+        for start, end in KNOWN_GRAPHICS_RANGES:
+            if start < len(data):
+                length = min(end, len(data)) - start
+                graphics_mask[start:start + length] = b"\x01" * length
+    for address, byte in enumerate(data):
+        if graphics_mask[address]:
+            yield "%"
+        elif known_only:
+            yield CHARACTER_TABLE.get(byte, "_")
+        else:
+            yield glyph_for(byte)
+
+
+def decode(data: bytes, known_only: bool = False, omit_sprites: bool = False) -> str:
+    return "".join(render_glyphs(data, known_only, omit_sprites))
+
+
+def wrap_text(data: bytes, known_only: bool = False, omit_sprites: bool = False) -> str:
+    lines: list[tuple[int, str]] = []
+    line_chars: list[str] = []
+    line_address = 0
+
+    for address, glyph in enumerate(render_glyphs(data, known_only, omit_sprites)):
+        for character in glyph:
+            if len(line_chars) == WRAP_WIDTH:
+                lines.append((line_address, "".join(line_chars)))
+                line_chars = []
+            if not line_chars:
+                line_address = address
+            line_chars.append(character)
+
+    if line_chars:
+        lines.append((line_address, "".join(line_chars)))
+    return "\n".join(f"0x{address:05X}: {line}" for address, line in lines)
 
 
 def main(argv: list[str]) -> int:
-    rom_path = Path(argv[0]) if len(argv) > 0 else DEFAULT_ROM
-    output_path = Path(argv[1]) if len(argv) > 1 else DEFAULT_OUTPUT
-    if len(argv) > 2:
-        print("Usage: render_text.py [rom [output]]", file=sys.stderr)
-        return 1
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(decode(rom_path.read_bytes()), encoding="utf-8")
-    print(f"Wrote {output_path}")
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--wrap", action="store_true", help="wrap output every 64 characters")
+    parser.add_argument(
+        "--known-only",
+        action="store_true",
+        help="render unknown or undefined bytes as underscores",
+    )
+    parser.add_argument(
+        "--omit-sprites",
+        action="store_true",
+        help="render bytes in known graphics ranges as percent signs",
+    )
+    parser.add_argument("rom", nargs="?", type=Path, default=DEFAULT_ROM)
+    parser.add_argument("output", nargs="?", type=Path, default=DEFAULT_OUTPUT)
+    args = parser.parse_args(argv)
+
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+    data = args.rom.read_bytes()
+    if args.wrap:
+        text = wrap_text(data, known_only=args.known_only, omit_sprites=args.omit_sprites)
+    else:
+        text = decode(data, known_only=args.known_only, omit_sprites=args.omit_sprites)
+    args.output.write_text(text, encoding="utf-8")
+    print(f"Wrote {args.output}")
     return 0
 
 

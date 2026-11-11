@@ -95,9 +95,41 @@ GLYPH_PAIRS = (
 )
 
 TEXT_LABELS = {
+    0x41AF: "Pause-menu item selection label: itm",
+    0x41BB: "Pause-menu character power label: pow",
+    0x41C1: "Pause-menu map label: map",
+    0x41C7: "Pause-menu save label: sav",
+    0x43C3: "Character name: Pit",
+    0x43CA: "Character name: Lane",
+    0x43D3: "Character name: Kyle",
+    0x43DB: "Character name: Jude",
+    0x43E3: "Character name: Lee",
+    0x43EA: "Character name: Lora",
+    0x43F3: "Character name: Zold",
     0x4736: "Ability and weapon names; some separators unidentified",
     0x4998: "Range names; leading byte unverified",
+    0x4999: "Range label: narrow",
+    0x499F: "Range label: middle",
+    0x49A5: "Range label: wide",
+    0x49AB: "Range label: short",
+    0x49B1: "Range label: long",
     0x4A7C: "Character and class names",
+    0x4A7D: "Class name: knight",
+    0x4A83: "Character name: Pit",
+    0x4A87: "Class name: elf",
+    0x4A8A: "Character name: Lane",
+    0x4A8E: "Class name: cleric",
+    0x4A94: "Character name: Kyle",
+    0x4A98: "Class name: zombie",
+    0x4A9E: "Character name: Jude",
+    0x4AA2: "Class name: wizard",
+    0x4AA8: "Character name: Lee",
+    0x4AAC: "Class name: kungfu",
+    0x4AB2: "Character name: Lora",
+    0x4AB6: "Class name: cupid",
+    0x4ABB: "Character name: Zold",
+    0x4ABF: "Class name: master",
+    0x4C77: "Character change label: chr change",
     0x50CB: "Alphabet table",
     0x5109: "Alphabet table",
     0x58EB: "Alphabet table with repeated letters",
@@ -143,6 +175,8 @@ BANK5_REFERENCE_POINTS = {
 def text_label(start: int) -> str:
     if start >= 0x1E620:
         return "Unclassified control-byte fragment; not confirmed text"
+    if 0x471B <= start < 0x4821 and start != 0x4736:
+        return "Ability, weapon, or stat label fragment"
     return TEXT_LABELS.get(start, "Dialogue or story text candidate; boundaries and consumer unverified")
 
 

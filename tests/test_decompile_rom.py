@@ -29,7 +29,7 @@ class DecompileRomTests(unittest.TestCase):
         blocks = {(start, end) for start, end, _ in decompile_rom.SPRITE_BLOCKS}
         for heading, next_heading in (
             ("### Hero animation, weapon, and spell sprites", "### Numeric and HUD glyph tiles"),
-            ("### Stockable item sprites", "### Stacked 1bpp glyph tiles"),
+            ("### Stockable inventory item sprites", "### Stacked 1bpp glyph tiles"),
             ("### Healing item and energy sprites", "### Ending credits text"),
         ):
             section = documentation.split(heading, 1)[1].split(next_heading, 1)[0]
@@ -66,9 +66,9 @@ class DecompileRomTests(unittest.TestCase):
         listing = decompile_rom.disassemble(rom, 0x808D, 0x8090)
         self.assertIn("Hero UI icon: sword", listing)
         self.assertIn("continued from before selected range", listing)
-        self.assertIn("Hero UI icon: magic ball [0x00808E, 0x0080CE); starts within instruction at 0x00808D", listing)
+        self.assertIn("Hero UI icon: Magic Ball [0x00808E, 0x0080CE); starts within instruction at 0x00808D", listing)
         self.assertIn("; 00808D: C3 00 00\n    JP $0000", listing)
-        self.assertNotIn("Hero UI icon: magic ball", decompile_rom.disassemble(rom, 0x808C, 0x808E))
+        self.assertNotIn("Hero UI icon: Magic Ball", decompile_rom.disassemble(rom, 0x808C, 0x808E))
         self.assertNotIn("Hero UI icon: sword", decompile_rom.disassemble(rom, 0x808E, 0x808F))
 
     def test_overlapping_blocks_and_bank_boundaries(self):
@@ -110,7 +110,7 @@ class DecompileRomTests(unittest.TestCase):
     def test_other_annotations_are_gated_and_overlap_sprite_blocks(self):
         rom = self.target_rom()
         listing = decompile_rom.disassemble(rom, 0xB886, 0xB887)
-        self.assertIn("; Sprite: Stockable large potion", listing)
+        self.assertIn("; Sprite: Stockable Large Potions", listing)
         self.assertIn("; Graphics: Presumed graphics descriptor source range", listing)
         rom[0x147] = 0
         self.assertNotIn("; Graphics:", decompile_rom.disassemble(rom, 0xB886, 0xB887))
@@ -122,7 +122,7 @@ class DecompileRomTests(unittest.TestCase):
         blocks = {(start, end) for start, end, category, _ in decompile_rom.ROM_ANNOTATIONS
                   if category == "Graphics"}
         section = documentation.split("### Numeric and HUD glyph tiles", 1)[1].split(
-            "### Stockable item sprites", 1)[0]
+            "### Stockable inventory item sprites", 1)[0]
         ranges = re.findall(r"^\| `0x([0-9A-F]+)-0x([0-9A-F]+)` \|", section, re.M)
         self.assertEqual(len(ranges), 50)
         for first, last in ranges:

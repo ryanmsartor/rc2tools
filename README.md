@@ -145,7 +145,20 @@ Decode the whole ROM through the documented character table into one string (`ou
 
 ```sh
 ./rc2t render-text
+./rc2t render-text --wrap
+./rc2t render-text --known-only
+./rc2t render-text --known-only --wrap
+./rc2t render-text --wrap --known-only --omit-sprites
 ```
+
+Pass `--wrap` to insert line breaks every 64 characters, prefixed with the
+zero-padded ROM byte address (for example, `0x00000: `).
+Pass `--known-only` to show `_` for unknown or undefined bytes while retaining
+known mappings such as `+` for line breaks and `#` for end of string.
+Pass `--omit-sprites` to replace each byte in the documented graphics ranges
+(the blue `--highlight-known` ranges, including glyphs) with `%`. Outside
+those ranges, `%` can also be the normal placeholder for an unknown byte; use
+`--known-only` to distinguish it. The options can be combined.
 
 Dump all identified text ranges, including overlapping fragments, credits,
 name lists, alphabet tables, and unclassified control-byte runs:

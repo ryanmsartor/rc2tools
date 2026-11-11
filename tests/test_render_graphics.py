@@ -426,6 +426,37 @@ class RenderGraphicsTests(unittest.TestCase):
         self.assertEqual(blue_count(credits_colors), 0)
         self.assertEqual(yellow_count(color_counts(title)), 64)
 
+    def test_item_name_fragments_shade_exact_bytes_in_yellow(self):
+        ranges = (
+            (0x040A2, 0x040AC),
+            (0x040B0, 0x040BC),
+            (0x040CC, 0x040D6),
+            (0x040DA, 0x040E6),
+            (0x040F6, 0x04100),
+            (0x04104, 0x04110),
+            (0x04120, 0x0412A),
+            (0x0412E, 0x0413A),
+        )
+        image = render_graphics.render_tile_grid(
+            bytes([0xFF] * render_graphics.TILE_BYTES * 6),
+            6,
+            1,
+            columns=6,
+            scale=1,
+            start_address=0x040A0,
+            highlight_known=True,
+        )
+        expected_rows = sum(
+            any(start <= address and address + 1 < end for start, end in ranges)
+            for address in range(0x040A0, 0x04100, 2)
+        )
+        self.assertEqual(yellow_count(color_counts(image)), expected_rows * 8)
+        for start, end in ranges:
+            with self.subTest(start=hex(start), end=hex(end)):
+                self.assertEqual(render_graphics.known_kind(start), "text")
+                self.assertEqual(render_graphics.known_kind(end - 1), "text")
+                self.assertIsNone(render_graphics.known_kind(end))
+
     def test_text_highlight_stops_at_its_end_address(self):
         tile = bytes([0xFF] * render_graphics.TILE_BYTES)
         # 0xBFAB is the exclusive end of the documented credits range.
@@ -436,6 +467,50 @@ class RenderGraphicsTests(unittest.TestCase):
         self.assertEqual(blue_count(color_counts(image)), 0)
         self.assertEqual(render_graphics.known_kind(0xBFAA), "text")
         self.assertIsNone(render_graphics.known_kind(0xBFAB))
+
+    def test_pause_menu_labels_highlight_only_their_bytes(self):
+        ranges = (
+            (0x041AF, 0x041B3),
+            (0x041BB, 0x041BF),
+            (0x041C1, 0x041C5),
+            (0x041C7, 0x041CB),
+        )
+        for start, end in ranges:
+            with self.subTest(start=hex(start)):
+                self.assertIsNone(render_graphics.known_kind(start - 1))
+                for address in range(start, end):
+                    self.assertEqual(render_graphics.known_kind(address), "text")
+                self.assertIsNone(render_graphics.known_kind(end))
+
+    def test_character_name_ranges_highlight_only_their_bytes(self):
+        self.assertIsNone(render_graphics.known_kind(0x043C2))
+        for address in range(0x043C3, 0x043FB):
+            self.assertEqual(render_graphics.known_kind(address), "text")
+        self.assertIsNone(render_graphics.known_kind(0x043FB))
+
+    def test_stat_labels_before_ability_table_are_highlighted(self):
+        for start, end in ((0x0471B, 0x04721), (0x04722, 0x04727),
+                           (0x04728, 0x0472E), (0x0472F, 0x04736)):
+            with self.subTest(start=hex(start)):
+                self.assertIsNone(render_graphics.known_kind(start - 1))
+                for address in range(start, end):
+                    self.assertEqual(render_graphics.known_kind(address), "text")
+        self.assertEqual(render_graphics.known_kind(0x04736), "text")
+
+    def test_range_labels_extend_existing_highlighting(self):
+        for start, end in ((0x04999, 0x0499F), (0x0499F, 0x049A5),
+                           (0x049A5, 0x049AB), (0x049AB, 0x049B1),
+                           (0x049B1, 0x049B7)):
+            with self.subTest(start=hex(start)):
+                for address in range(start, end):
+                    self.assertEqual(render_graphics.known_kind(address), "text")
+        self.assertIsNone(render_graphics.known_kind(0x049B7))
+
+    def test_character_change_label_highlighting(self):
+        self.assertIsNone(render_graphics.known_kind(0x04C76))
+        for address in range(0x04C77, 0x04C81):
+            self.assertEqual(render_graphics.known_kind(address), "text")
+        self.assertIsNone(render_graphics.known_kind(0x04C81))
 
     def test_documented_text_and_table_ranges_shade_in_yellow(self):
         tile = bytes([0xFF] * render_graphics.TILE_BYTES)

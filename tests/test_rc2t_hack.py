@@ -40,7 +40,7 @@ class HackWrapperTests(unittest.TestCase):
         shutil.copy2(ROOT / "rc2h", self.root / "rc2h")
         for name in ("hack_rom.py", "swap_character_sprite.py", "ability_art.py", "sprite_art.py",
                      "art_layout.py", "character_art.py", "font_art.py", "npc_art.py", "render_graphics.py",
-                     "extract_json.py"):
+                     "known_graphics.py", "extract_json.py"):
             shutil.copy2(ROOT / "bin" / name, self.root / "bin" / name)
         self.rom = bytes(range(256)) * 0x200
         (self.root / "input" / ROM_NAME).write_bytes(self.rom)

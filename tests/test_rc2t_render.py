@@ -20,7 +20,7 @@ class RenderGraphicsWrapperTests(unittest.TestCase):
         (self.root / "bin").mkdir()
         (self.root / "input").mkdir()
         shutil.copy2(ROOT / "rc2t", self.root / "rc2t")
-        for name in ("render_graphics.py", "extract_json.py"):
+        for name in ("render_graphics.py", "known_graphics.py", "extract_json.py"):
             shutil.copy2(ROOT / "bin" / name, self.root / "bin" / name)
         bin_path = str(self.root / "bin")
         sys.path.insert(0, bin_path)
