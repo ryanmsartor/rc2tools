@@ -41,6 +41,6 @@ Repository conventions for anyone (human or agent) changing this project.
 
 ## Documentation
 
-- The README is a high-level overview of functionality. Don't document layout details that users can see by running a command (such as the exact sprite grid or stat array format).
+- The README is a high-level overview of functionality. Don't document layout details that users can see by running a command (such as the exact sprite grid or stat array format). Do not update it to include references to changes to tools between versions, or internal implementation details.
 - Keep `docs/rom-map.md` current when ROM addresses, tables, or graphics change.
 

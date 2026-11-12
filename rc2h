@@ -8,7 +8,19 @@ fi
 case "$1" in
     h|help|-h|-help|--h|--help)
         "$(dirname "$0")/rc2t" hack --help | sed '1s/^usage: rc2t hack /usage: rc2h /'
-        exit $?
+        status=$?
+        [ "$status" -eq 0 ] || exit "$status"
+        echo "  dump-text [rom-or-hex]  Dump documented strings to working/strings.txt"
+        echo "  inject-text [rom-or-hex] Inject working/strings.txt into working/injected.gb"
+        exit 0
+        ;;
+    dump-text)
+        shift
+        exec python3 "$(dirname "$0")/bin/dump_text.py" "$@"
+        ;;
+    inject-text)
+        shift
+        exec python3 "$(dirname "$0")/bin/inject_text.py" "$@"
         ;;
 esac
 

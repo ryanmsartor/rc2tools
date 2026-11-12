@@ -147,24 +147,43 @@ Pass `--omit-sprites` to replace each byte in the documented graphics ranges
 those ranges, `%` can also be the normal placeholder for an unknown byte; use
 `--known-only` to distinguish it. The options can be combined.
 
-Dump all identified text ranges, including overlapping fragments, credits,
-name lists, alphabet tables, and unclassified control-byte runs:
+Dump all identified text ranges, including text fragments, credits,
+name lists, the retained alphabet table, and unclassified control-byte runs:
 
 ```sh
-./rc2t dump-text
-./rc2t dump-text path/to/game.gb output/known-text.txt
+./rc2h dump-text
+./rc2h dump-text path/to/game.gb
 ```
 
-The default output is `output/known-text.txt`. Each line has the format
-`0xSSSSS-0xEEEEE : decoded text`, using zero-padded physical ROM offsets;
-the end is exclusive. Exact duplicate ranges are listed once, but distinct
-overlapping ranges are kept. Output follows the character table and unknown
-byte placeholders used by `render-text`; the ASCII cartridge title is decoded
-as ASCII, with its non-printable padding shown as a placeholder. Name lists
-are raw decoded bytes, including unidentified separators. The ROM must match
-the Rolan's Curse II (USA) size and header;
-a complete `.hex` dump is also accepted. Existing output is overwritten.
-Update the range list in `bin/dump_text.py` when documenting new text.
+The command writes `working/strings.txt`; it is not part of `rc2t`. Each line
+has the format `0xSSSSS-0xEEEEE : text`, using zero-padded physical ROM
+offsets and exclusive end addresses. The ranges do not overlap. In this
+editable notation, `_` represents byte `0xFE`, `=` represents `0x26`, and `-`
+represents `0x2B`; a regular space represents `0xB2`, except in the two
+documented `0x30` space ranges. The ASCII cartridge title is included.
+The ROM must match the Rolan's Curse II (USA) size and header; a complete
+`.hex` dump is also accepted. Existing output is overwritten. Update the range
+list in `bin/dump_text.py` when documenting new text.
+
+After editing `working/strings.txt`, inject its segments into a ROM:
+
+```sh
+./rc2h inject-text
+./rc2h inject-text path/to/game.gb
+```
+
+`inject-text` writes `working/injected.gb`; it reads the same default ROM as
+`dump-text` unless a ROM path is supplied. Every documented range must appear
+exactly once in the strings file. Shorter replacements are padded at the end
+with the applicable space byte (`0xB2` by default, `0x30` in the two
+exception ranges, and ASCII space for the cartridge title). An overlong
+replacement or invalid strings file fails before the output ROM is written.
+The error reports the range and, for overlong segments, the maximum and
+attempted character counts. Text characters are restricted to those present in
+the non-title ranges in the dump of the base input ROM; the cartridge title is
+excluded from character identity validation but still obeys the range length.
+Invalid-character errors identify the character and range and print the dense
+allowed-character list. The ROM header and global checksums are recalculated.
 
 The highlighted physical-ROM ranges follow the graphics and text documented in
 [the ROM map](./docs/rom-map.md) and [the known-text list](./docs/known-text.md). Highlighting follows the known byte ranges,
@@ -247,6 +266,8 @@ address labels. Ranges that span several banks use the same layout.
 that copy from `input/` first if it does not exist.
 
 `./rc2h` is a shorthand for `./rc2t hack` and accepts the same arguments.
+It also provides `dump-text` to write the selected ROM strings to
+`working/strings.txt`.
 Run `./rc2h` without arguments, or with `h`, `help`, `-h`, `-help`, `--h`,
 or `--help`, to see its commands.
 

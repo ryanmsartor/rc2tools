@@ -387,7 +387,7 @@ class RenderGraphicsTests(unittest.TestCase):
             tile, columns=1, scale=1, start_address=0xBC80, highlight_known=True
         )
         colors = {color: count for count, color in image.getcolors(image.width * image.height)}
-        # Rows at 0xBC80-0xBC85 are inside the known range; 0xBC86-0xBC8F are not.
+        # Only text bytes from 0xBC8A onward are in the known ranges.
         self.assertEqual(blue_count(colors), 48)
 
 
@@ -418,7 +418,7 @@ class RenderGraphicsTests(unittest.TestCase):
             tile, 1, 1, columns=1, scale=1, start_address=0x0134, highlight_known=True
         )
         credits_colors = color_counts(credits)
-        self.assertEqual(yellow_count(credits_colors), 64)
+        self.assertEqual(yellow_count(credits_colors), 48)
         self.assertEqual(blue_count(credits_colors), 0)
         self.assertEqual(yellow_count(color_counts(title)), 64)
 
@@ -455,14 +455,14 @@ class RenderGraphicsTests(unittest.TestCase):
 
     def test_text_highlight_stops_at_its_end_address(self):
         tile = bytes([0xFF] * render_graphics.TILE_BYTES)
-        # 0xBFAB is the exclusive end of the documented credits range.
+        # 0xBFAD is the exclusive end of the final credits text fragment.
         image = render_graphics.render_tile_grid(
             tile, 1, 1, columns=1, scale=1, start_address=0xBFA8, highlight_known=True
         )
-        self.assertEqual(yellow_count(color_counts(image)), 8)
+        self.assertEqual(yellow_count(color_counts(image)), 16)
         self.assertEqual(blue_count(color_counts(image)), 0)
-        self.assertEqual(render_graphics.known_kind(0xBFAA), "text")
-        self.assertIsNone(render_graphics.known_kind(0xBFAB))
+        self.assertEqual(render_graphics.known_kind(0xBFAC), "text")
+        self.assertIsNone(render_graphics.known_kind(0xBFAD))
 
     def test_pause_menu_labels_highlight_only_their_bytes(self):
         ranges = (
@@ -510,7 +510,7 @@ class RenderGraphicsTests(unittest.TestCase):
 
     def test_documented_text_and_table_ranges_shade_in_yellow(self):
         tile = bytes([0xFF] * render_graphics.TILE_BYTES)
-        for address in (0x050CB, 0x17D4E, 0x1BD4E, 0x1C0F5, 0x1E620):
+        for address in (0x050CB, 0x17D4E, 0x1BD4E, 0x1C0E0, 0x1E620):
             with self.subTest(address=hex(address)):
                 image = render_graphics.render_tile_grid(
                     tile,
@@ -526,6 +526,9 @@ class RenderGraphicsTests(unittest.TestCase):
         self.assertEqual(render_graphics.known_kind(0x050CB), "text")
         self.assertEqual(render_graphics.known_kind(0x050E6), "text")
         self.assertEqual(render_graphics.known_kind(0x050E7), None)
+        self.assertIsNone(render_graphics.known_kind(0x1C0F5))
+        self.assertIsNone(render_graphics.known_kind(0x1E2E6))
+        self.assertIsNone(render_graphics.known_kind(0x1C257))
         table = render_graphics.render_tile_grid(
             tile, 1, 1, columns=1, scale=1, start_address=0x1717C, highlight_known=True
         )

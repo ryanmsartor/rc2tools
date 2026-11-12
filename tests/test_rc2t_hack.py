@@ -302,6 +302,8 @@ class HackWrapperTests(unittest.TestCase):
         expected = self.run_wrapper("--help")
         self.assertEqual(expected.returncode, 0)
         help_text = expected.stdout.replace("usage: rc2t hack ", "usage: rc2h ", 1)
+        help_text += "  dump-text [rom-or-hex]  Dump documented strings to working/strings.txt\n"
+        help_text += "  inject-text [rom-or-hex] Inject working/strings.txt into working/injected.gb\n"
         for args in ((), ("h",), ("help",), ("-h",), ("-help",), ("--h",), ("--help",)):
             with self.subTest(args=args):
                 result = subprocess.run(

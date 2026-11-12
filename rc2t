@@ -18,7 +18,6 @@ rc2t_print_help_message() {
     echo "    --wrap             Wrap output every 64 characters with ROM addresses"
     echo "    --known-only       Render unknown or undefined bytes as underscores"
     echo "    --omit-sprites     Render known graphics bytes as percent signs"
-    echo "  dump-text [rom-or-hex [output]]  Dump documented text ranges into output/known-text.txt"
     echo "  decompile | disassemble [rom [output]] [--start OFFSET] [--end OFFSET]  Disassemble a Game Boy ROM"
     echo "  recompile [assembly-file]  Assemble an input/ .asm file into output/<basename> (recompiled).gb"
     echo "  hack <subcommand>  Edit the working/ hack copy:"
@@ -87,10 +86,6 @@ case "$1" in
 
     render-text|rt)
         python3 bin/render_text.py "${@:2}"
-        ;;
-
-    dump-text)
-        python3 bin/dump_text.py "${@:2}"
         ;;
 
     decompile|disassemble)

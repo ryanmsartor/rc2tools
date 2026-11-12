@@ -1,9 +1,9 @@
 # Rolan's Curse II (USA) known text
 
 The identified ranges are physical ROM offsets with exclusive end addresses.
-Run `./rc2t dump-text` to decode them from the ROM into
-`output/known-text.txt`. The exact range list, including overlapping
-fragments, is maintained in [dump_text.py](../bin/dump_text.py). The
+Run `./rc2h dump-text` to decode the selected ranges from the ROM into
+`working/strings.txt`. The exact, non-overlapping range list is maintained in
+[dump_text.py](../bin/dump_text.py). The
 corresponding bytes are shaded yellow by `render-graphics --highlight-known`;
 the graphics ranges are documented in [the ROM map](./rom-map.md).
 
@@ -22,7 +22,7 @@ the game's text routine.
 | `0x0A-0x23` | `a`-`z` (`0x0A` = `a`) |
 | `0xB2` | Space |
 | `0x24` | Apostrophe |
-| `0x26` | `-` (dash), inferred from `boomer-ang` and mapped at the user's request |
+| `0x26` | `=` in `dump-text` notation (the dash-like glyph in `boomer-ang`); maps back to `0x26` for injection |
 | `0x27` | Period, confirmed by the alphabet tables at `0x17D4E` and `0x1BD4E` |
 | `0x28` | Probably a comma; interpretation remains tentative, although the alphabet tables support it |
 | `0x29` | `?`, confirmed by the alphabet tables |
@@ -31,7 +31,7 @@ the game's text routine.
 | `0x2D` | `:`, confirmed by speaker labels |
 | `0x30` | Space, inferred from its use between words in `licensed by nintendo` and `american sammy corp.` |
 | `0xFD` | Line break, confirmed by the user from the game's display; rendered as `+` |
-| `0xFE` | Space, identified by the user from `chr change` at `0x04C77-0x04C81` |
+| `0xFE` | `_` in `dump-text` notation for this space byte, identified by the user from `chr change` at `0x04C77-0x04C81` |
 | `0xFF` | End of a text segment; rendered as `#` |
 | `0xE0-0xE3` | Hero name placeholder, rendered as `HERO` |
 | Other bytes (`0xDF`, `0xE4`, `0xE5`, `0xEB`, `0xEC`, `0xEE`, `0x7D`, `0x84`, `0xBF`, `0x04`, and others) | Control codes; not resolved |
@@ -47,15 +47,60 @@ routine, and the byte meanings are unconfirmed.
 ### Rendering
 
 `./rc2t render-text` decodes every ROM byte with this table into one
-continuous string in `output/rom-text.txt`. `./rc2t dump-text` instead
+continuous string in `output/rom-text.txt`. `./rc2h dump-text` instead
 outputs the selected ranges, one per line with padded start and exclusive end
-offsets. By default, both render unknown bytes as distinct placeholders indexed
-by byte value; the title range in `dump-text` uses ASCII for printable bytes.
+offsets to `working/strings.txt`. In its editable notation, `0xFE` is `_`,
+`0x26` is `=`, and `0x2B` is `-`; this distinguishes the two dash-like bytes
+and preserves the `0xFE` space encoding. Ordinary spaces represent `0xB2`,
+except for the `0x30` space ranges listed below. By default, both render unknown
+bytes as distinct placeholders indexed by byte value; the title range in
+`dump-text` uses ASCII for printable bytes.
+Dump ranges exclude `0xFF` end markers by their exclusive end address;
+marker-only locations are not included as ranges.
 For `render-text`, `--known-only` replaces unknown bytes with `_`, and
 `--omit-sprites` replaces bytes in the known graphics ranges with `%`. Both
 options can be combined with `--wrap`.
 Placeholder symbols avoid the 1bpp font's characters and known glyphs. The
 pool and exact mapping are defined in [render_text.py](../bin/render_text.py).
+The full-ROM `render-text` command retains its existing glyph rendering, where
+`0xFE` and `0x26` display as spaces and a dash, respectively.
+
+### Space and injection encoding notes
+
+The two `0x30` space ranges are exceptional and should retain that byte when
+injecting new spaces:
+
+| Physical ROM range | Text |
+|---|---|
+| `0x13D60-0x13D74` | `licensed by nintendo` |
+| `0x13D88-0x13D9C` | `american sammy corp.` |
+
+Ordinary spaces in dump notation map to `0xB2`, except in the two ranges above,
+where they map to `0x30`. `./rc2h inject-text` reads the edited
+`working/strings.txt`, requires every documented range exactly once, and
+writes `working/injected.gb`. Shorter replacements are padded at the end with
+the applicable space byte; the cartridge title uses ASCII spaces. An
+overlong segment fails before the output ROM is written and reports the range,
+maximum character count, and attempted character count. The ROM header and
+global checksums are recalculated.
+
+When a displayed character is ambiguous with an unknown-byte placeholder,
+inject-text preserves the original byte if that character remains at its
+original position. This lets an unedited dump be injected without changing
+unknown bytes.
+
+The injector only accepts characters found in non-title ranges of the dump of
+the base input ROM. The cartridge title is excluded from character identity
+validation but remains subject to range length validation. The allowed
+character set is:
+
+```text
+" !'+,-.:=?HERO_abcdefghijklmnopqrstuvwxyz"
+```
+
+The surrounding double quotes delimit the list; its first character is a
+space. Invalid-character errors include the offending character, attempted
+range, and this dense allowed-character list.
 
 ## Cartridge title
 
@@ -66,8 +111,11 @@ The ASCII cartridge title and its padding are at `0x0134-0x0144`.
 The candidate dialogue and story ranges are mostly `0xFF`-terminated. They
 were identified by a heuristic text scan, which may miss strings containing
 placeholders or control codes. Pointers to the strings have not been traced,
-so their consumers are unconfirmed. Some documented candidate starts are
-inside longer strings, and the dump retains those overlapping fragments.
+so their consumers are unconfirmed. Some candidate strings start within
+longer ROM strings; dump ranges do not overlap.
+Within `0x1C0C0-0x1E314`, ranges are split at unknown control-code sequences;
+both the code bytes and payload bytes are excluded from dumping and highlighting.
+The exact fragments are maintained in [dump_text.py](../bin/dump_text.py).
 
 - The candidate at `0x1CCE9-0x1CCFD` begins with two spaces; its start is not
   yet confirmed.
@@ -120,27 +168,34 @@ follows the user's choices; see the ranges for exact boundaries.
 | `0x049B1-0x049B7` | Range label `long`. |
 | `0x4A7C-0x4AC9` | Character and class names; ends with `0x9D`. Individual names and classes are listed below. |
 | `0x04C77-0x04C81` | Character change label `chr change`; `0xFE` is the space. |
-| `0x050CB-0x050E7` | Alphabet table. |
-| `0x05109-0x0511B` | Alphabet table. |
-| `0x058EB-0x0590F` | Alphabet table with repeated letters. |
+| `0x050CB-0x050E7` | Alphabet table; documented and highlighted, but not included in `dump-text`. |
+| `0x05109-0x0511B` | Alphabet table; documented and highlighted, but not included in `dump-text`. |
+| `0x058EB-0x0590F` | Alphabet table with repeated letters; documented and highlighted, but not included in `dump-text`. |
 | `0x13D3B-0x13D40` | `start`. |
 | `0x13D42-0x13D4A` | `continue`. |
 | `0x13D60-0x13D74` | `licensed by nintendo`. |
 | `0x13D88-0x13D9C` | `american sammy corp.`. |
-| `0x17C8D-0x17CF4` | Place names |
 | `0x17D08-0x17D12` | Input-name screen label `input name`. |
-| `0x17D4E-0x17D6F` | Alphabet and punctuation table; the first string, from `a` through the space after `-`, is the input-name screen keyboard. |
-| `0x17D70-0x17D80` | Alphabet table followed by one selection byte. |
-| `0x1B315-0x1B32E` | Character names separated by `0xFE`. |
-| `0x1B32E-0x1B331` | Character level abbreviation `lv.`. |
-| `0x1B9A1-0x1B9C7` | Concatenated party-menu prompts and a trailing `0x04` byte. |
-| `0x1BD4E-0x1BD6F` | Same as `0x17D4E-0x17D6F`. |
-| `0x1BD70-0x1BD80` | Same as `0x17D70-0x17D80`. |
+| `0x17D4E-0x17D6F` | Alphabet and punctuation table; the first string, from `a` through the space after `-`, is the input-name screen keyboard. Documented and highlighted, but not included in `dump-text`. |
+| `0x17D70-0x17D80` | Alphabet table followed by one selection byte; documented and highlighted, but not included in `dump-text`. |
+| `0x1B311-0x1B315` | `pit ` (includes trailing space). |
+| `0x1B315-0x1B319` | `lane`. |
+| `0x1B319-0x1B31D` | `kyle`. |
+| `0x1B31D-0x1B321` | `jude`. |
+| `0x1B321-0x1B325` | `lee ` (includes trailing space). |
+| `0x1B325-0x1B329` | `lora`. |
+| `0x1B329-0x1B32D` | `zold`. |
+| `0x1B32D-0x1B331` | ` lv.` (includes leading space). |
+| `0x1B9A1-0x1B9C6` | Concatenated party-menu prompts through `member`. |
+| `0x1BD4E-0x1BD6F` | Same as `0x17D4E-0x17D6F`; the only alphabet table included in `dump-text`. |
+| `0x1BD70-0x1BD80` | Same as `0x17D70-0x17D80`; documented and highlighted, but not included in `dump-text`. |
 
 ### Place-name fragments
 
-These labels are concatenated within `0x17C8D-0x17CF4`; the leading `w`
-rendered before `graves` remains unverified.
+These labels are dumped as individual fragments from the concatenated
+`0x17C8D-0x17CF4` region. The leading byte at `0x17C8D` and trailing byte at
+`0x17CF3` are not included in the fragments; the leading `w` remains
+unverified.
 
 | Physical ROM range | Fragment |
 |---|---|
@@ -250,11 +305,31 @@ The candidate `0x1717C-0x17185` is not included in the dump or highlighting:
 it resembles a list of letters rather than dialogue and remains unclassified
 until its consumer is traced.
 
-## Ending credits decode ranges
+## Ending credits text ranges
 
-Bytes starting at `0xBC86` are not machine code. The ranges
-`0xBC86-0xBD1D` and `0xBD1E-0xBFAB` decode to English text using the table
-above, but are not `#`-terminated strings. The last documented segment ends
-at `0xBFAB`, with `0x2A` at `0xBFAC`. The bytes after that are control codes
-and non-text data, up to a `0xFF` at `0xBFDB`. Where the credits data ends
-and what reads these bytes is not yet traced.
+These ROM areas contain English text separated by unknown control codes.
+Each range below contains only contiguous text bytes; control codes are
+excluded. The second area continues through `come!` at `0x0BFAD`, extending
+past the former end at `0x0BFAB`. Control data follows, including a `0xFF` at
+`0x0BFDB`; what reads these bytes is not yet traced.
+
+| Physical ROM range |
+|---|
+| `0x0BC8A-0x0BCBD` |
+| `0x0BCBE-0x0BCEC` |
+| `0x0BCED-0x0BD16` |
+| `0x0BD24-0x0BD54` |
+| `0x0BD55-0x0BD64` |
+| `0x0BD6B-0x0BDA0` |
+| `0x0BDA1-0x0BDA7` |
+| `0x0BDAE-0x0BDE0` |
+| `0x0BDE1-0x0BE08` |
+| `0x0BE0F-0x0BE3D` |
+| `0x0BE3E-0x0BE55` |
+| `0x0BE5C-0x0BE8F` |
+| `0x0BE96-0x0BEC5` |
+| `0x0BECC-0x0BEFE` |
+| `0x0BF05-0x0BF32` |
+| `0x0BF33-0x0BF64` |
+| `0x0BF65-0x0BF98` |
+| `0x0BF99-0x0BFAD` |
