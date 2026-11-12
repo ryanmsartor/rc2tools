@@ -10,7 +10,7 @@ render_text = load_bin_module("render_text")
 class RenderTextTests(unittest.TestCase):
     def test_known_bytes_decode_to_their_glyphs(self):
         self.assertEqual(render_text.decode(bytes([0x0A, 0x23])), "az")
-        self.assertEqual(render_text.decode(bytes([0xB2, 0xFE, 0x24, 0x26, 0x27, 0x28, 0x29, 0x2A, 0x2B, 0x2D, 0xFD, 0xFF])), "  '-.,?!-:+#")
+        self.assertEqual(render_text.decode(bytes([0xB2, 0xFE, 0x24, 0x26, 0x27, 0x28, 0x29, 0x2A, 0x2B, 0x2D, 0x30, 0xFD, 0xFF])), "  '-.,?!-: +#")
 
     def test_hero_placeholders_render_as_capital_hero(self):
         self.assertEqual(render_text.decode(bytes([0xE0, 0xE1, 0xE2, 0xE3])), "HERO")
@@ -21,9 +21,9 @@ class RenderTextTests(unittest.TestCase):
         self.assertEqual(render_text.decode(bytes([0x00, 0xDF, 0x24])), render_text.UNKNOWN_GLYPHS[0x00] + render_text.UNKNOWN_GLYPHS[0xDF] + "'")
 
     def test_known_only_decode_uses_underscores_for_unknown_bytes(self):
-        data = bytes([0x0A, 0x00, 0x26, 0xFD, 0xFE, 0xFF, 0xB2])
+        data = bytes([0x0A, 0x00, 0x26, 0x30, 0xFD, 0xFE, 0xFF, 0xB2])
 
-        self.assertEqual(render_text.decode(data, known_only=True), "a_-+ # ")
+        self.assertEqual(render_text.decode(data, known_only=True), "a_- + # ")
 
     def test_placeholders_avoid_font_and_known_glyphs(self):
         font_and_known = set(render_text.CHARACTER_TABLE.values()) | set("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-:.?!/()'\";")

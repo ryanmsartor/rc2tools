@@ -29,6 +29,7 @@ the game's text routine.
 | `0x2A` | `!`, confirmed by the alphabet tables |
 | `0x2B` | `-` (hyphen), confirmed by the user and the alphabet tables |
 | `0x2D` | `:`, confirmed by speaker labels |
+| `0x30` | Space, inferred from its use between words in `licensed by nintendo` and `american sammy corp.` |
 | `0xFD` | Line break, confirmed by the user from the game's display; rendered as `+` |
 | `0xFE` | Space, identified by the user from `chr change` at `0x04C77-0x04C81` |
 | `0xFF` | End of a text segment; rendered as `#` |
@@ -73,9 +74,9 @@ inside longer strings, and the dump retains those overlapping fragments.
 - `0x1E20F-0x1E231` and `0x1E231-0x1E257` are NPC dialogue.
 - `0x1E257-0x1E26F`, `0x1E26F-0x1E295`, and `0x1E295-0x1E2AB`
   correspond to dog, chicken, and frog NPCs, respectively.
-- The candidate at `0x1BABA-0x1BACC` is unterminated. Its `0xFE` bytes
-  render as spaces; the trailing `0x01` renders as `%` and may be a period.
-  The preceding `0x20` (rendered as `w`) is excluded.
+- The candidate at `0x1BABA-0x1BACC` contains `hasleft the party`, followed by
+  a trailing `0x01` that renders as `%` and may be a period. The preceding
+  `0x20` (rendered as `w`) is excluded.
 
 ## Menu labels, name lists, party fragments, and alphabet tables
 
@@ -122,13 +123,55 @@ follows the user's choices; see the ranges for exact boundaries.
 | `0x050CB-0x050E7` | Alphabet table. |
 | `0x05109-0x0511B` | Alphabet table. |
 | `0x058EB-0x0590F` | Alphabet table with repeated letters. |
-| `0x17C8D-0x17CF4` | Place names; the leading `0x20` (rendered as `w`) is unverified. |
-| `0x17D4E-0x17D6F` | Alphabet and punctuation table supporting the character mapping. |
+| `0x13D3B-0x13D40` | `start`. |
+| `0x13D42-0x13D4A` | `continue`. |
+| `0x13D60-0x13D74` | `licensed by nintendo`. |
+| `0x13D88-0x13D9C` | `american sammy corp.`. |
+| `0x17C8D-0x17CF4` | Place names |
+| `0x17D08-0x17D12` | Input-name screen label `input name`. |
+| `0x17D4E-0x17D6F` | Alphabet and punctuation table; the first string, from `a` through the space after `-`, is the input-name screen keyboard. |
 | `0x17D70-0x17D80` | Alphabet table followed by one selection byte. |
 | `0x1B315-0x1B32E` | Character names separated by `0xFE`. |
-| `0x1B9AA-0x1B9C7` | Party-message fragments separated by `0xFE` and an unmapped byte; ends with `0x04`. |
+| `0x1B32E-0x1B331` | Character level abbreviation `lv.`. |
+| `0x1B9A1-0x1B9C7` | Concatenated party-menu prompts and a trailing `0x04` byte. |
 | `0x1BD4E-0x1BD6F` | Same as `0x17D4E-0x17D6F`. |
 | `0x1BD70-0x1BD80` | Same as `0x17D70-0x17D80`. |
+
+### Place-name fragments
+
+These labels are concatenated within `0x17C8D-0x17CF4`; the leading `w`
+rendered before `graves` remains unverified.
+
+| Physical ROM range | Fragment |
+|---|---|
+| `0x17C8E-0x17C94` | `graves` |
+| `0x17C94-0x17C9B` | `keepers` |
+| `0x17C9B-0x17CA1` | `fields` |
+| `0x17CA1-0x17CA7` | `castle` |
+| `0x17CA7-0x17CAC` | `baroa` |
+| `0x17CAC-0x17CB1` | `cadal` |
+| `0x17CB1-0x17CB7` | `virgin` |
+| `0x17CB7-0x17CBF` | `mushroom` |
+| `0x17CBF-0x17CC5` | `duwane` |
+| `0x17CC5-0x17CCB` | `metals` |
+| `0x17CCB-0x17CD0` | `ruins` |
+| `0x17CD0-0x17CD5` | `guild` |
+| `0x17CD5-0x17CDC` | `fossils` |
+| `0x17CDC-0x17CE3` | `canyons` |
+| `0x17CE3-0x17CEB` | `farewell` |
+| `0x17CEB-0x17CF3` | `dungeons` |
+
+### Party-menu and party-status fragments
+
+The first three prompts are concatenated without separators.
+
+| Physical ROM range | Fragment |
+|---|---|
+| `0x1B9A1-0x1B9B3` | `your party is full` |
+| `0x1B9B3-0x1B9C0` | `exchange your` |
+| `0x1B9C0-0x1B9C6` | `member` |
+| `0x1BA08-0x1BA0C` | `quit` |
+| `0x1BABA-0x1BACB` | `hasleft the party` |
 
 ### Character and class fragments
 
