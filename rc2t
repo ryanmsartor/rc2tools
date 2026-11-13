@@ -19,6 +19,7 @@ rc2t_print_help_message() {
     echo "    --known-only       Render unknown or undefined bytes as underscores"
     echo "    --omit-sprites     Render known graphics bytes as percent signs"
     echo "  decompile | disassemble [rom [output]] [--start OFFSET] [--end OFFSET]  Disassemble a Game Boy ROM"
+    echo "  compile-il <source> [output]  Expand reusable routines into assembly"
     echo "  recompile [assembly-file]  Assemble an input/ .asm file into output/<basename> (recompiled).gb"
     echo "  hack <subcommand>  Edit the working/ hack copy:"
     echo "    clear                             Delete the in-progress hack copy and hacks.txt"
@@ -90,6 +91,10 @@ case "$1" in
 
     decompile|disassemble)
         python3 bin/decompile_rom.py "${@:2}"
+        ;;
+
+    compile-il)
+        python3 bin/compile_il.py "${@:2}"
         ;;
 
     recompile)

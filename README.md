@@ -81,6 +81,12 @@ size of 32 KiB; listings made with `--start` or `--end` do not reconstruct the
 omitted bytes. Regenerate listings made by older versions of the disassembler
 before recompiling them.
 
+### Reusable assembly routines
+
+Use `./rc2t compile-il` to expand named values and parameterized routines into
+an assembly listing before recompiling it. See the [intermediate language
+guide](docs/intermediate-language.md) for syntax and usage.
+
 ## Render graphics as tile grids, sprites, and portraits
 
 To render the entire default ROM (including non-graphics data) to
